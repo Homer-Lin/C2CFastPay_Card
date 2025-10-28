@@ -1,84 +1,110 @@
 package com.example.c2cfastpay_card.UIScreen.Screens
 
+import android.util.Log
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
-
-import android.util.Log
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.c2cfastpay_card.data.CardData
+import com.example.c2cfastpay_card.R
+import com.example.c2cfastpay_card.UIScreen.components.ProductItem
+import com.example.c2cfastpay_card.UIScreen.components.ProductRepository
+import com.example.c2cfastpay_card.UIScreen.components.WishRepository
+import com.example.c2cfastpay_card.navigation.Screen
+
+// --- 修改：重新加入 LazySwipeableCards 相關的 import ---
 import com.spartapps.swipeablecards.state.rememberSwipeableCardsState
 import com.spartapps.swipeablecards.ui.lazy.LazySwipeableCards
 import com.spartapps.swipeablecards.ui.lazy.items
+import com.example.c2cfastpay_card.UIScreen.components.CardItem // <-- 確保 import 我們修改過的 CardItem
+// --- 修改結束 ---
 
-
-// 假設您的 drawable 資源都存在於 R.drawable 中
-import com.example.c2cfastpay_card.R
-import com.example.c2cfastpay_card.UIScreen.components.CardItem
-import com.example.c2cfastpay_card.navigation.Screen
 
 @Composable
-fun CardStack(
-    data: List<CardData>,
-    navController: NavController, // <-- 3. 加入 NavController 參數
-    modifier: Modifier = Modifier,  // <-- 4. 讓 modifier 成為可選的 (修正錯誤)
+fun CardStackScreen( // 外層 Composable，管理 ViewModel
+    navController: NavController
 ) {
-    var indexInput by remember { mutableStateOf(0.toString()) }
-    val state = rememberSwipeableCardsState(
-        itemCount = { data.size }
+    val context = LocalContext.current
+    val productRepository = remember { ProductRepository(context) }
+    val wishRepository = remember { WishRepository(context) }
+    val viewModel: CardStackViewModel = viewModel(
+        factory = CardStackViewModelFactory(productRepository, wishRepository)
     )
+    val cardsToShow by viewModel.cards.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
-    ConstraintLayout(modifier = Modifier.fillMaxSize()) {
-        // 建立對應 XML id 的 references
+    Log.d("CardStackDebug", "CardStackScreen recomposing. isLoading: $isLoading, cardsToShow: ${cardsToShow.size}")
+
+    LaunchedEffect(Unit) {
+        Log.d("CardStackDebug", "LaunchedEffect triggered. Calling loadPotentialMatches()")
+        viewModel.loadPotentialMatches()
+    }
+
+    CardStackLayout(
+        navController = navController,
+        items = cardsToShow,
+        isLoading = isLoading
+    )
+}
+
+// 實際的佈局 Composable
+@Composable
+fun CardStackLayout(
+    navController: NavController,
+    items: List<ProductItem>,
+    isLoading: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    // --- 修改：將 state 重新加回來 ---
+//    val state = rememberSwipeableCardsState(
+//        itemCount = { items.size }
+//    )
+    // --- 修改結束 ---
+
+    ConstraintLayout(modifier = modifier.fillMaxSize()) {
         val (
             imageView29, imageButton37, textView32, imageButton38,
-            imageView37, button13, button14, imageButton39,
-            textView33, imageButton44, textView44, textView45,
-            textView46, textView47 ,cardDeck
+            cardDeck,
+            textView33
         ) = createRefs()
+
+        // --- 頂部 UI (Banner + 按鈕 + 標題) (保持不變) ---
         Image(
-            painter = painterResource(id = R.drawable.banner_in_choose_photo),
+            painter = painterResource(id = R.drawable.banner_in_choose_photo), //
             contentDescription = "Banner",
             modifier = Modifier.constrainAs(imageView29) {
-                bottom.linkTo(parent.bottom, margin = 556.dp)
+                top.linkTo(parent.top)
                 start.linkTo(parent.start)
                 end.linkTo(parent.end)
-                width = Dimension.wrapContent
+                width = Dimension.fillToConstraints
                 height = Dimension.wrapContent
-            }
+            },
+            contentScale = ContentScale.FillWidth
         )
         IconButton(
-            onClick = {navController.popBackStack() },
-            modifier = Modifier
-                .size(50.dp)
-                .constrainAs(imageButton37) {
-                    start.linkTo(parent.start, margin = 8.dp)
-                    top.linkTo(parent.top, margin = 34.dp)
-                },
+            onClick = { navController.popBackStack() },
+            modifier = Modifier.size(50.dp).constrainAs(imageButton37) {
+                start.linkTo(parent.start, margin = 8.dp)
+                top.linkTo(parent.top, margin = 34.dp)
+            },
             colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Transparent)
         ) {
             Image(
-                painter = painterResource(id = R.drawable.a_1_back_buttom), // 替換為您的 R.drawable
+                painter = painterResource(id = R.drawable.a_1_back_buttom), //
                 contentDescription = "Back"
             )
         }
@@ -93,54 +119,79 @@ fun CardStack(
         )
         IconButton(
             onClick = { /* TODO: 幫助操作 */ },
-            modifier = Modifier
-                .size(50.dp)
-                .constrainAs(imageButton38) {
-                    end.linkTo(parent.end, margin = 8.dp)
-                    top.linkTo(parent.top, margin = 36.dp)
-                },
+            modifier = Modifier.size(50.dp).constrainAs(imageButton38) {
+                end.linkTo(parent.end, margin = 8.dp)
+                top.linkTo(parent.top, margin = 36.dp)
+            },
             colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Transparent)
         ) {
             Image(
-                painter = painterResource(id = R.drawable.b_13_help), // 替換為您的 R.drawable
+                painter = painterResource(id = R.drawable.b_13_help), //
                 modifier = Modifier.size(30.dp),
                 contentDescription = "Help",
             )
         }
+        // --- 頂部 UI 結束 ---
 
-        Column(
-            modifier = Modifier.constrainAs(cardDeck) {
-                top.linkTo(parent.top)
-                bottom.linkTo(parent.bottom)
-                start.linkTo(parent.start)
-                end.linkTo(parent.end)
-                width = Dimension.fillToConstraints
-                height = Dimension.fillToConstraints
-            },
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+
+        // --- 中央內容區 (還原為 LazySwipeableCards) ---
+        Box(
+            modifier = Modifier
+                .constrainAs(cardDeck) {
+                    top.linkTo(imageView29.bottom, margin = 20.dp)
+                    bottom.linkTo(textView33.top, margin = 20.dp)
+                    start.linkTo(parent.start, margin = 32.dp)
+                    end.linkTo(parent.end, margin = 32.dp)
+                    width = Dimension.fillToConstraints
+                    height = Dimension.fillToConstraints
+                }
+                .fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            //滑動時做的事情
-            LazySwipeableCards(
-                modifier = Modifier.padding(20.dp),
-                state = state,
-                onSwipe = { item, direction ->
-                    Log.d("CardsScreen", "onSwipe: $item, $direction")
-                },
-            ) {
-                items(data) { item, index, offset ->
-                    CardItem(
-                        index = index,
-                        cardData = item,
-                        offset = offset
+            Log.d("CardStackDebug", "CardStackLayout recomposing inside Box. isLoading: $isLoading")
+            if (isLoading) {
+                Log.d("CardStackDebug", "Displaying CircularProgressIndicator")
+                CircularProgressIndicator()
+            } else {
+                Log.d("CardStackDebug", "Displaying Cards or Empty Text. Item count: ${items.size}")
+
+                // --- 修改：還原 LazySwipeableCards ---
+                if (items.isNotEmpty()) {
+                    val state = rememberSwipeableCardsState(
+                        itemCount = { items.size }
+                    )
+                    LazySwipeableCards(
+                        state = state,
+                        onSwipe = { index, direction ->
+                            // index 是被滑掉的項目在 items 列表中的索引
+                            Log.d("CardsScreen", "onSwipe: index $index, direction $direction")
+                            // TODO: 階段三處理 swipeRight / swipeLeft
+                        },
+                    ) {
+                        items(items) { product, index, offset -> // <-- 直接傳入 items 列表
+                            CardItem(
+                                product = product,
+                                offset = offset
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "目前沒有符合您願望的商品",
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                     )
                 }
+                // --- 修改結束 ---
             }
         }
+        // --- 中央內容區結束 ---
+
+
+        // --- 底部按鈕 (保持不變) ---
         TextButton(
-            onClick = {navController.navigate(Screen.History.route)}, // <-- 3. 加入 onClick 動作
+            onClick = { navController.navigate(Screen.History.route) }, //
             modifier = Modifier.constrainAs(textView33) {
-                // 4. 約束和之前一樣
                 start.linkTo(parent.start, margin = 16.dp)
                 bottom.linkTo(parent.bottom, margin = 36.dp)
             }
@@ -150,7 +201,6 @@ fun CardStack(
                 color = Color(0xFF759E9F)
             )
         }
+        // --- 底部按鈕結束 ---
     }
 }
-
-

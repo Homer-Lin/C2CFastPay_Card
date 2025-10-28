@@ -6,12 +6,12 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.example.c2cfastpay_card.UIScreen.Screens.CardStack
 import com.example.c2cfastpay_card.UIScreen.Screens.HistoryScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.SaleProductPage
 import com.example.c2cfastpay_card.UIScreen.Screens.WishPreviewPage
 import com.example.c2cfastpay_card.UIScreen.Screens.AddProductScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.AddWishScreen
+import com.example.c2cfastpay_card.UIScreen.Screens.CardStackScreen
 import com.example.c2cfastpay_card.data.CardData
 
 /**
@@ -21,7 +21,7 @@ import com.example.c2cfastpay_card.data.CardData
 @Composable
 fun AppNavigationGraph(
     navController: NavHostController,
-    cardData: List<CardData> // 我們需要將卡片資料傳遞給 CardStack
+//    cardData: List<CardData> // 我們需要將卡片資料傳遞給 CardStack
 ) {
     NavHost(
         navController = navController,
@@ -29,10 +29,7 @@ fun AppNavigationGraph(
     ) {
         // --- 卡片堆疊 ---
         composable(route = Screen.CardStack.route) {
-            CardStack(
-                data = cardData,
-                navController = navController // 將「遙控器」傳遞下去
-            )
+            CardStackScreen(navController = navController)
         }
         // --- 歷史紀錄 ---
         composable(route = Screen.History.route) {

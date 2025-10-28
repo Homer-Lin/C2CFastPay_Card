@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
-import com.example.c2cfastpay_card.UIScreen.Screens.CardStack
 import com.example.c2cfastpay_card.data.largeData
 import com.example.c2cfastpay_card.navigation.AppNavigationGraph
 import com.example.c2cfastpay_card.ui.theme.C2CFastPay_CardTheme
@@ -27,7 +26,7 @@ class MainActivity : ComponentActivity() {
 
                 AppNavigationGraph(
                     navController = navController,
-                    cardData = largeData
+//                    cardData = largeData
                 )
             }
         }
