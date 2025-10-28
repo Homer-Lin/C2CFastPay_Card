@@ -44,6 +44,8 @@ import kotlinx.coroutines.withContext
 import androidx.compose.material3.MaterialTheme // <-- 匯入 MaterialTheme
 import com.example.c2cfastpay_card.ui.theme.SaleColorScheme // <-- 匯入 Sale 配色
 
+
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddProductScreen(navController: NavController, wishJson: String? = null) {
@@ -54,11 +56,17 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
     val scrollState = rememberScrollState()
 
     // --- 狀態管理 (來自您原本的 Compose 程式碼) ---
-    val actualWishJson = if (wishJson == "null") null else wishJson
+    val actualWishJson = if (wishJson == "null" || wishJson.isNullOrEmpty()) {
+        null
+    } else {
+        wishJson
+    }
     val wishItem = try {
         actualWishJson?.let { Gson().fromJson(it, WishItem::class.java) }
     } catch (e: Exception) {
-        null
+        // 可以加入錯誤處理，例如 Logcat 輸出
+        // Log.e("AddProductScreen", "Error parsing wishJson: ${e.message}")
+        null // 解析失敗也視為 null
     }
 
     var productName by remember { mutableStateOf(wishItem?.title ?: "") }
@@ -89,7 +97,7 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                     },
                     navigationIcon = {
                         // 返回按鈕 (匹配 XML)
-                        IconButton(onClick = { navController.popBackStack() }) {
+                        IconButton(onClick = { navController.navigate(Screen.Sale.route) }) {
                             Image(
                                 painter = painterResource(id = R.drawable.a_1_back_buttom), // 使用 XML 的 drawable
                                 contentDescription = "返回"

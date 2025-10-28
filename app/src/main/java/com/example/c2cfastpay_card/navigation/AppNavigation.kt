@@ -49,11 +49,16 @@ fun AppNavigationGraph(
 
         // 4. 快速上架畫面 (帶有參數)
         composable(
-            route = Screen.AddProduct.route,
-            arguments = listOf(navArgument("wishJson") { type = NavType.StringType })
+            route = Screen.AddProduct.route, // 使用更新後的 route "add_product?wishJson={wishJson}"
+            arguments = listOf(navArgument("wishJson") {
+                type = NavType.StringType
+                nullable = true       // <--- 將參數設為可選
+                defaultValue = null // <--- 提供預設值 null
+            })
         ) { backStackEntry ->
-            // 從路由中提取參數
+            // 現在如果 wishJson 參數不存在，getString 會回傳 null
             val wishJson = backStackEntry.arguments?.getString("wishJson")
+            // 傳遞可能為 null 的 wishJson 給 AddProductScreen
             AddProductScreen(navController = navController, wishJson = wishJson)
         }
 
