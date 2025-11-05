@@ -3,9 +3,8 @@ package com.example.c2cfastpay_card.UIScreen.Screens
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.aspectRatio // 1. 確保 import
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,26 +23,30 @@ import androidx.navigation.NavController
 import com.example.c2cfastpay_card.R
 import com.example.c2cfastpay_card.UIScreen.components.ProductItem
 import com.example.c2cfastpay_card.UIScreen.components.ProductRepository
-import com.example.c2cfastpay_card.UIScreen.components.WishRepository
+import com.example.c2cfastpay_card.UIScreen.components.MatchRepository // 2. 確保 import
 import com.example.c2cfastpay_card.navigation.Screen
-
-// --- 修改：重新加入 LazySwipeableCards 相關的 import ---
 import com.spartapps.swipeablecards.state.rememberSwipeableCardsState
 import com.spartapps.swipeablecards.ui.lazy.LazySwipeableCards
 import com.spartapps.swipeablecards.ui.lazy.items
-import com.example.c2cfastpay_card.UIScreen.components.CardItem // <-- 確保 import 我們修改過的 CardItem
-// --- 修改結束 ---
+import com.example.c2cfastpay_card.UIScreen.components.CardItem
+// 3. 修正 Import：使用您提供的正確路徑
+import com.spartapps.swipeablecards.ui.SwipeableCardDirection
 
 
 @Composable
-fun CardStackScreen( // 外層 Composable，管理 ViewModel
+fun CardStackScreen( // 外層 Composable
     navController: NavController
 ) {
     val context = LocalContext.current
+    // 4. 建立兩個 Repositories
     val productRepository = remember { ProductRepository(context) }
+    val matchRepository = remember { MatchRepository(context) }
+
+    // 5. 建立 ViewModel，傳入兩個 Repositories
     val viewModel: CardStackViewModel = viewModel(
-        factory = CardStackViewModelFactory(productRepository) // <-- 只傳入 productRepository
+        factory = CardStackViewModelFactory(productRepository, matchRepository)
     )
+
     val cardsToShow by viewModel.cards.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
@@ -54,10 +57,12 @@ fun CardStackScreen( // 外層 Composable，管理 ViewModel
         viewModel.loadPotentialMatches()
     }
 
+    // 6. 呼叫 CardStackLayout，傳入 viewModel
     CardStackLayout(
         navController = navController,
         items = cardsToShow,
-        isLoading = isLoading
+        isLoading = isLoading,
+        viewModel = viewModel // <-- 傳入 viewModel
     )
 }
 
@@ -65,16 +70,11 @@ fun CardStackScreen( // 外層 Composable，管理 ViewModel
 @Composable
 fun CardStackLayout(
     navController: NavController,
-    items: List<ProductItem>,
+    items: List<ProductItem>, // <-- 'items' 在這裡被定義
     isLoading: Boolean,
+    viewModel: CardStackViewModel, // <-- 接收 viewModel
     modifier: Modifier = Modifier,
 ) {
-    // --- 修改：將 state 重新加回來 ---
-//    val state = rememberSwipeableCardsState(
-//        itemCount = { items.size }
-//    )
-    // --- 修改結束 ---
-
     ConstraintLayout(modifier = modifier.fillMaxSize()) {
         val (
             imageView29, imageButton37, textView32, imageButton38,
@@ -100,8 +100,7 @@ fun CardStackLayout(
             modifier = Modifier.size(50.dp).constrainAs(imageButton37) {
                 start.linkTo(parent.start, margin = 8.dp)
                 top.linkTo(parent.top, margin = 34.dp)
-            },
-            colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Transparent)
+            }
         ) {
             Image(
                 painter = painterResource(id = R.drawable.a_1_back_buttom), //
@@ -122,8 +121,7 @@ fun CardStackLayout(
             modifier = Modifier.size(50.dp).constrainAs(imageButton38) {
                 end.linkTo(parent.end, margin = 8.dp)
                 top.linkTo(parent.top, margin = 36.dp)
-            },
-            colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Transparent)
+            }
         ) {
             Image(
                 painter = painterResource(id = R.drawable.b_13_help), //
@@ -133,8 +131,6 @@ fun CardStackLayout(
         }
         // --- 頂部 UI 結束 ---
 
-
-        // --- 中央內容區 (還原為 LazySwipeableCards) ---
         Box(
             modifier = Modifier
                 .constrainAs(cardDeck) {
@@ -144,32 +140,38 @@ fun CardStackLayout(
                     end.linkTo(parent.end, margin = 32.dp)
                     width = Dimension.fillToConstraints
                     height = Dimension.wrapContent
-                }.
-                aspectRatio(0.75f) // (寬高比 3:4，您可以調整 0.7f, 0.8f 等)
-                ,
+                }
+                .aspectRatio(0.75f), // 保持卡片長寬比
             contentAlignment = Alignment.Center
         ) {
-            Log.d("CardStackDebug", "CardStackLayout recomposing inside Box. isLoading: $isLoading")
             if (isLoading) {
-                Log.d("CardStackDebug", "Displaying CircularProgressIndicator")
                 CircularProgressIndicator()
             } else {
-                Log.d("CardStackDebug", "Displaying Cards or Empty Text. Item count: ${items.size}")
-
-                // --- 修改：還原 LazySwipeableCards ---
                 if (items.isNotEmpty()) {
+
                     val state = rememberSwipeableCardsState(
                         itemCount = { items.size }
                     )
+
                     LazySwipeableCards(
                         state = state,
-                        onSwipe = { index, direction ->
-                            // index 是被滑掉的項目在 items 列表中的索引
-                            Log.d("CardsScreen", "onSwipe: index $index, direction $direction")
-                            // TODO: 階段三處理 swipeRight / swipeLeft
+
+                        // --- 8. 這是 *真正* 正確的 onSwipe 邏輯 ---
+                        onSwipe = { swipedProduct, direction ->
+                            // 'swipedProduct' *就是* ProductItem 物件
+                            // 'direction' *就是* SwipeableCardDirection
+
+                            // 直接呼叫 viewModel
+                            when (direction) {
+                                SwipeableCardDirection.Left -> viewModel.swipeLeft(swipedProduct as ProductItem) // <-- 類型轉換
+                                SwipeableCardDirection.Right -> viewModel.swipeRight(swipedProduct as ProductItem) // <-- 類型轉換
+                                else -> viewModel.swipeLeft(swipedProduct as ProductItem) // 預設當作不喜歡
+                            }
                         },
+                        // --- onSwipe 結束 ---
                     ) {
-                        items(items) { product, index, offset -> // <-- 直接傳入 items 列表
+                        // 9. 這裡的 items lambda 是用於 *顯示* 卡片
+                        items(items) { product, index, offset ->
                             CardItem(
                                 product = product,
                                 offset = offset
@@ -183,11 +185,8 @@ fun CardStackLayout(
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                     )
                 }
-                // --- 修改結束 ---
             }
         }
-        // --- 中央內容區結束 ---
-
 
         // --- 底部按鈕 (保持不變) ---
         TextButton(

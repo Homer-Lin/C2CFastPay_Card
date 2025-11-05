@@ -6,15 +6,16 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.c2cfastpay_card.UIScreen.components.ProductItem
 import com.example.c2cfastpay_card.UIScreen.components.ProductRepository
-// import com.example.c2cfastpay_card.UIScreen.components.WishRepository // <-- 1. 移除 WishRepository
+import com.example.c2cfastpay_card.UIScreen.components.MatchRepository
+import com.example.c2cfastpay_card.UIScreen.components.toMatchItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class CardStackViewModel(
-    private val productRepository: ProductRepository
-    // private val wishRepository: WishRepository // <-- 2. 移除
+    private val productRepository: ProductRepository,
+    private val matchRepository: MatchRepository // <-- 確保建構子接收 MatchRepository
 ) : ViewModel() {
 
     private val _cards = MutableStateFlow<List<ProductItem>>(emptyList())
@@ -35,36 +36,43 @@ class CardStackViewModel(
         viewModelScope.launch {
             Log.d("CardStackDebug", "Coroutine launched for loading data.")
             try {
-                // --- 3. 修改邏輯：只載入所有商品 ---
-                val allProducts = productRepository.getProductList()
+                val allProducts = productRepository.getProductList() //
                 Log.d("CardStackDebug", "Data loaded: ${allProducts.size} products")
-
-                // (移除所有 wishKeywords 和配對演算法)
-
-                _cards.value = allProducts.shuffled() // 直接顯示所有商品並打亂順序
+                _cards.value = allProducts.shuffled()
                 Log.d("CardStackDebug", "Matched products count: ${allProducts.size}")
-                // --- 修改結束 ---
-
             } finally {
                 Log.d("CardStackDebug", "Setting isLoading to false in finally block")
                 _isLoading.update { false }
             }
         }
     }
+
+    fun swipeLeft(product: ProductItem) {
+        Log.d("CardStackDebug", "Swiped Left on: ${product.title}")
+        _cards.update { currentList ->
+            currentList.filterNot { it.id == product.id }
+        }
+    }
+
+    fun swipeRight(product: ProductItem) {
+        Log.d("CardStackDebug", "Swiped Right (Liked): ${product.title}")
+        _cards.update { currentList ->
+            currentList.filterNot { it.id == product.id }
+        }
+        viewModelScope.launch {
+            matchRepository.addMatch(product.toMatchItem())
+        }
+    }
 }
 
-/**
- * 4. 修改 ViewModel Factory
- */
 class CardStackViewModelFactory(
-    private val productRepo: ProductRepository
-    // private val wishRepo: WishRepository // <-- 5. 移除
+    private val productRepo: ProductRepository,
+    private val matchRepo: MatchRepository // <-- 確保接收 MatchRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CardStackViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            // 6. 移除 wishRepo 的傳遞
-            return CardStackViewModel(productRepo) as T
+            return CardStackViewModel(productRepo, matchRepo) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
