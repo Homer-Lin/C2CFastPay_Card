@@ -50,17 +50,21 @@ class CardStackViewModel(
     fun swipeLeft(product: ProductItem) {
         Log.d("CardStackDebug", "Swiped Left on: ${product.title}")
         _cards.update { currentList ->
+            // 透過 ID 過濾，而不是依賴物件相等性
             currentList.filterNot { it.id == product.id }
         }
     }
 
     fun swipeRight(product: ProductItem) {
         Log.d("CardStackDebug", "Swiped Right (Liked): ${product.title}")
-        _cards.update { currentList ->
-            currentList.filterNot { it.id == product.id }
-        }
         viewModelScope.launch {
             matchRepository.addMatch(product.toMatchItem())
+            _cards.update { currentList ->
+                // 透過 ID 過濾，而不是依賴物件相等性
+                currentList.filterNot { it.id == product.id }
+
+
+            }
         }
     }
 }

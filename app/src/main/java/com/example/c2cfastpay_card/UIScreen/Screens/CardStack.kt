@@ -149,12 +149,23 @@ fun CardStackLayout(
             } else {
                 if (items.isNotEmpty()) {
 
-                    val state = rememberSwipeableCardsState(
-                        itemCount = { items.size }
-                    )
+                    // --- 修改開始 ---
+                    // 1. 使用 key(items.size) 包住所有東西
+                    //    當 items.size 改變時 (例如 3 -> 2)，
+                    //    key() { ... } 區塊內的一切都將被強制「重置」。
+                    key(items.size) {
 
-                    LazySwipeableCards(
-                        state = state,
+                        // 2. 將 items.size 作為「值」傳入
+                        //    而不是作為 lambda ({ items.size }) 傳入。
+                        //    這能確保新的 state 物件在建立時
+                        //    就 100% 知道正確的、最新的卡片數量。
+                        val state = rememberSwipeableCardsState(
+                            itemCount = { items.size } // <-- 這樣就 100% 正確了
+                        )
+                        // --- 修改結束 ---
+
+                        LazySwipeableCards(
+                            state = state,
 
                         // --- 8. 這是 *真正* 正確的 onSwipe 邏輯 ---
                         onSwipe = { swipedProduct, direction ->
@@ -176,6 +187,7 @@ fun CardStackLayout(
                                 product = product,
                                 offset = offset
                             )
+                            }
                         }
                     }
                 } else {
@@ -185,6 +197,8 @@ fun CardStackLayout(
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                     )
                 }
+
+
             }
         }
 

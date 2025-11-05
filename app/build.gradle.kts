@@ -58,7 +58,6 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation("com.github.smartword-app:compose-swipeable-cards:1.1.4")
-    implementation("androidx.constraintlayout:constraintlayout-compose:1.0.1")
     implementation("androidx.palette:palette-ktx:1.0.0")
     implementation("androidx.navigation:navigation-compose:2.9.5")
     implementation("io.coil-kt:coil-compose:2.6.0")
