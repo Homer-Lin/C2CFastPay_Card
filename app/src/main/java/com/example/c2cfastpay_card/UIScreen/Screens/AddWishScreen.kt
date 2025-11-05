@@ -38,6 +38,7 @@ import com.example.c2cfastpay_card.ui.theme.WishColorScheme // <-- 匯入 Wish �
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.c2cfastpay_card.utils.saveImageToInternalStorage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -272,6 +273,22 @@ fun AddWishScreen(navController: NavController) {
                             }
 
                             try {
+                                // --- 處理圖片 URI (這部分不變) ---
+                                val finalImageUriString = imageUri?.let { uri ->
+                                    saveImageToInternalStorage(context, uri)
+                                }
+                                // --- 處理結束 ---
+
+                                // --- 修改開始：將 String? 轉換回 Uri? ---
+                                // 我們的 saveImageToInternalStorage 回傳的是 String?
+                                // 但 wishRepository.saveWishData 預期的是 Uri?
+                                // 所以我們需要將 String? 解析(parse)回 Uri?
+                                val finalImageUri: Uri? = finalImageUriString?.let { uriString ->
+                                    Uri.parse(uriString) // Uri.parse() 會將 "file:///..." 字串轉回 Uri 物件
+                                }
+                                // --- 修改結束 ---
+
+                                // --- 傳遞轉換後的 finalImageUri ---
                                 wishRepository.saveWishData(
                                     wishTitle,
                                     wishDescription,
@@ -280,11 +297,10 @@ fun AddWishScreen(navController: NavController) {
                                     selectedTradeMethod,
                                     wishNotes,
                                     wishOtherInfo,
-                                    imageUri
+                                    finalImageUri // <-- 使用轉換後的永久 Uri (或 null)
                                 )
                                 withContext(Dispatchers.Main) {
-                                    Toast.makeText(context, "願望已成功新增", Toast.LENGTH_SHORT).show() // 修改提示文字
-                                    // 導航到許願列表或其他目標畫面
+                                    Toast.makeText(context, "願望已成功新增", Toast.LENGTH_SHORT).show()
                                     navController.navigate(Screen.WishList.route) {
                                         // 清除返回堆疊，避免用戶按返回又回到新增頁面
                                         popUpTo(navController.graph.startDestinationId) { inclusive = true }

@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.material3.MaterialTheme // <-- 匯入 MaterialTheme
 import com.example.c2cfastpay_card.ui.theme.SaleColorScheme // <-- 匯入 Sale 配色
-
+import com.example.c2cfastpay_card.utils.saveImageToInternalStorage
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -279,7 +279,18 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                         }
                         scope.launch(Dispatchers.IO) {
                             try {
+                                // --- 修改開始：處理圖片 URI ---
+                                // 1. 判斷是否有選擇圖片 (imageUri 是否不為 null)
+                                // 2. 如果有，呼叫 saveImageToInternalStorage 將圖片複製並取得新 URI
+                                // 3. 如果沒有選擇圖片，或複製失敗，則使用空字串
+                                val finalImageUriString = imageUri?.let { uri ->
+                                    saveImageToInternalStorage(context, uri)
+                                } ?: ""
+                                // --- 修改結束 ---
+
+                                // 建立 ProductItem 時，使用複製後的 finalImageUriString
                                 val newProduct = ProductItem(
+                                    // id = ... (如果您有加入 id 欄位，它會自動產生)
                                     title = productName,
                                     description = productDescription,
                                     specs = productSpecs,
@@ -287,13 +298,15 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                                     payment = selectedTradeMethod,
                                     notes = productNotes,
                                     other = productOtherInfo,
-                                    imageUri = imageUri?.toString() ?: ""
+                                    imageUri = finalImageUriString // <-- 使用複製後的永久 URI
                                 )
-                                productRepository.addProduct(newProduct)
+
+                                productRepository.addProduct(newProduct) //
+
                                 withContext(Dispatchers.Main) {
                                     Toast.makeText(context, "商品已成功上架", Toast.LENGTH_SHORT)
                                         .show()
-                                    navController.navigate(Screen.Sale.route) {
+                                    navController.navigate(Screen.Sale.route) { //
                                         popUpTo(Screen.Sale.route) { inclusive = true }
                                     }
                                 }

@@ -3,6 +3,7 @@ package com.example.c2cfastpay_card.UIScreen.Screens
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,9 +41,8 @@ fun CardStackScreen( // 外層 Composable，管理 ViewModel
 ) {
     val context = LocalContext.current
     val productRepository = remember { ProductRepository(context) }
-    val wishRepository = remember { WishRepository(context) }
     val viewModel: CardStackViewModel = viewModel(
-        factory = CardStackViewModelFactory(productRepository, wishRepository)
+        factory = CardStackViewModelFactory(productRepository) // <-- 只傳入 productRepository
     )
     val cardsToShow by viewModel.cards.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -143,9 +143,10 @@ fun CardStackLayout(
                     start.linkTo(parent.start, margin = 32.dp)
                     end.linkTo(parent.end, margin = 32.dp)
                     width = Dimension.fillToConstraints
-                    height = Dimension.fillToConstraints
-                }
-                .fillMaxSize(),
+                    height = Dimension.wrapContent
+                }.
+                aspectRatio(0.75f) // (寬高比 3:4，您可以調整 0.7f, 0.8f 等)
+                ,
             contentAlignment = Alignment.Center
         ) {
             Log.d("CardStackDebug", "CardStackLayout recomposing inside Box. isLoading: $isLoading")
@@ -177,7 +178,7 @@ fun CardStackLayout(
                     }
                 } else {
                     Text(
-                        text = "目前沒有符合您願望的商品",
+                        text = "目前沒有任何上架的商品",
                         fontSize = 18.sp,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                     )

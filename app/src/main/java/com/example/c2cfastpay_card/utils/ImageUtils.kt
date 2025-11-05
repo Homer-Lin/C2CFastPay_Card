@@ -1,21 +1,44 @@
-package com.example.c2cfastpay_card.utils
+package com.example.c2cfastpay_card.utils // 確保 package 名稱正確
 
-import androidx.annotation.DrawableRes
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.res.imageResource
-import androidx.palette.graphics.Palette
+import android.content.Context
+import android.net.Uri
+import android.util.Log
+import androidx.core.net.toUri
+import java.io.File
+import java.io.FileOutputStream
+import java.util.UUID
 
-@Composable
-fun rememberDominantColor(@DrawableRes imageRes: Int, defaultColor: Int = 0xFFFFFF): Color {
-    val bitmap = ImageBitmap.imageResource(imageRes)
-    val color = remember(bitmap) {
-        Palette.from(bitmap.asAndroidBitmap())
-            .generate()
-            .getDominantColor(defaultColor)
+// ... 這裡保留您原有的 rememberDominantColor 函數 ...
+
+
+/**
+ * 將使用者選擇的圖片 (content:// URI) 複製到 App 內部的 filesDir
+ * 並回傳一個指向新檔案的永久性 URI 字串 (file:///...)
+ */
+fun saveImageToInternalStorage(context: Context, uri: Uri): String {
+    return try {
+        // 開啟選擇圖片的輸入流
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return ""
+
+        // 在 App 的內部儲存空間 (filesDir) 建立一個獨一無二的檔案名稱
+        val fileName = "product_image_${UUID.randomUUID()}.jpg"
+        // 使用 filesDir 而不是 cacheDir，確保檔案不會被系統隨意清除
+        val outputFile = File(context.filesDir, fileName)
+
+        // 使用 FileOutputStream 將輸入流寫入到新檔案
+        FileOutputStream(outputFile).use { outputStream ->
+            inputStream.copyTo(outputStream)
+        }
+
+        // 關閉輸入流
+        inputStream.close()
+
+        // 回傳新檔案的 URI 字串
+        outputFile.toUri().toString()
+
+    } catch (e: Exception) {
+        // 如果複製過程中出錯，記錄錯誤並回傳空字串
+        Log.e("ImageSaveError", "Failed to save image to internal storage: ${e.message}")
+        ""
     }
-    return Color(color)
 }
