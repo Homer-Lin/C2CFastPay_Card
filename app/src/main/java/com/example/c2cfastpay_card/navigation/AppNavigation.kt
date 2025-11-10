@@ -1,5 +1,6 @@
 package com.example.c2cfastpay_card.navigation
 
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -13,6 +14,14 @@ import com.example.c2cfastpay_card.UIScreen.Screens.AddProductScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.AddWishScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.CardStackScreen
 import com.example.c2cfastpay_card.data.CardData
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.example.c2cfastpay_card.UIScreen.components.WishRepository
+import com.google.gson.Gson
 
 /**
  * 這是「導航圖」(NavHost)。
@@ -44,24 +53,57 @@ fun AppNavigationGraph(
             WishPreviewPage(navController = navController)
         }
 
-        // 4. 快速上架畫面 (帶有參數)
+// --- 【步驟二：完整替換 'AddProduct' 區塊】 ---
+        // 4. 快速上架畫面 (修改為接收 wishUuid)
         composable(
-            route = Screen.AddProduct.route, // 使用更新後的 route "add_product?wishJson={wishJson}"
-            arguments = listOf(navArgument("wishJson") {
+            route = Screen.AddProduct.route, // 使用 Screen.kt 的新路徑 "add_product?wishUuid={wishUuid}"
+            arguments = listOf(navArgument("wishUuid") { // 1. 改為接收 wishUuid
                 type = NavType.StringType
-                nullable = true       // <--- 將參數設為可選
-                defaultValue = null // <--- 提供預設值 null
+                nullable = true       // 參數是可選的
+                defaultValue = null // 預設值為 null
             })
         ) { backStackEntry ->
-            // 現在如果 wishJson 參數不存在，getString 會回傳 null
-            val wishJson = backStackEntry.arguments?.getString("wishJson")
-            // 傳遞可能為 null 的 wishJson 給 AddProductScreen
-            AddProductScreen(navController = navController, wishJson = wishJson)
+
+            val context = LocalContext.current
+            val wishRepository = remember { WishRepository(context) }
+            val wishUuid = backStackEntry.arguments?.getString("wishUuid")
+            Log.d("DataFlowDebug", "步驟 2: AppNavigation 收到 Uuid = $wishUuid")
+            // 準備一個 state 來存放 wishJson，並標記是否加載中
+            var wishJsonForScreen by remember { mutableStateOf<String?>(null) }
+            var isLoading by remember { mutableStateOf(true) }
+
+            LaunchedEffect(wishUuid) {
+                if (wishUuid != null) {
+                    // 【這就是您說的「抓資料」的動作】
+                    // 呼叫我們在步驟三新增的函式
+
+                    val wishItem = wishRepository.getWishByUuid(wishUuid)
+                    Log.d("DataFlowDebug", "步驟 3: 從 Repository 抓到 WishItem = $wishItem")
+                    if (wishItem != null) {
+                        wishJsonForScreen = Gson().toJson(wishItem) // 轉換為 JSON
+                        Log.d("DataFlowDebug", "步驟 4: 轉換為 JSON = $wishJsonForScreen")
+                    }
+                }
+                isLoading = false // 標記加載完成
+            }
+
+            // 只有在加載完成後 (isLoading = false) 才顯示 AddProductScreen
+            if (!isLoading) {
+                Log.d("DataFlowDebug", "步驟 5: 傳遞 JSON 給 AddProductScreen = $wishJsonForScreen")
+                // 【安全地傳遞資料】
+                // 這裡會安全地傳入 wishJson (可能為 null)
+                // 您的 AddProductScreen 檔案 不需要修改
+                // 它內部的邏輯 會完美處理這種情況
+                AddProductScreen(
+                    navController = navController,
+                    wishJson = wishJsonForScreen
+                )
+            }
         }
+        // --- 【修改區塊結束】 ---
 
         composable(route = Screen.AddWish.route) {
             AddWishScreen(navController = navController)
-            // --- 您可以在此加入更多 composable() 來定義更多畫面 ---
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.example.c2cfastpay_card.UIScreen.Screens
 
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +30,9 @@ import androidx.core.net.toUri
 import kotlinx.coroutines.launch
 import androidx.navigation.NavController
 import com.google.gson.Gson
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.compose.ui.platform.LocalLifecycleOwner
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,10 +43,12 @@ fun WishPreviewPage(
     val wishRepository = remember { WishRepository(context) }
     var wishList by remember { mutableStateOf<List<WishItem>>(emptyList()) }
     val scope = rememberCoroutineScope()
-
-    LaunchedEffect(Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
         scope.launch {
-            wishList = wishRepository.getWishList()
+            lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                wishList = wishRepository.getWishList()
+            }
         }
     }
     Scaffold(
@@ -165,7 +171,15 @@ fun WishPreviewPage(
                     .padding(top = 200.dp, bottom = 56.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                items(wishList) { wish ->
+                items(
+                    count = wishList.size,
+                    key = { index ->
+                        // 2. 根據索引(index)找到 wish，並使用其 id 作為 key
+                        wishList[index].uuid //
+                    }
+                ) { index ->
+                    // 3. 取得該索引的 wish 物件
+                    val wish = wishList[index]
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -199,8 +213,9 @@ fun WishPreviewPage(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Button(
                                     onClick = {
-                                        val json = Uri.encode(Gson().toJson(wish))
-                                        navController.navigate("add_product/$json")
+                                        val wishUuid = wish.uuid //
+                                        Log.d("DataFlowDebug", "步驟 1: 正在導航... Uuid = $wishUuid")
+                                        navController.navigate("add_product?wishUuid=$wishUuid")
                                     },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = Color(

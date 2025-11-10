@@ -1,6 +1,7 @@
 package com.example.c2cfastpay_card.UIScreen.Screens
 
 import android.net.Uri
+import android.util.Log // 【新增】Log Import
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,7 +16,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack // 使用 AutoMirrored
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,10 +42,10 @@ import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.material3.MaterialTheme // <-- 匯入 MaterialTheme
-import com.example.c2cfastpay_card.ui.theme.SaleColorScheme // <-- 匯入 Sale 配色
+import androidx.compose.material3.MaterialTheme
+import com.example.c2cfastpay_card.ui.theme.SaleColorScheme
 import com.example.c2cfastpay_card.utils.saveImageToInternalStorage
-
+import androidx.core.net.toUri // 【新增】toUri Import
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,35 +56,79 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
 
-    // --- 狀態管理 (來自您原本的 Compose 程式碼) ---
-    val actualWishJson = if (wishJson == "null" || wishJson.isNullOrEmpty()) {
-        null
-    } else {
-        wishJson
-    }
-    val wishItem = try {
-        actualWishJson?.let { Gson().fromJson(it, WishItem::class.java) }
-    } catch (e: Exception) {
-        // 可以加入錯誤處理，例如 Logcat 輸出
-        // Log.e("AddProductScreen", "Error parsing wishJson: ${e.message}")
-        null // 解析失敗也視為 null
-    }
 
-    var productName by remember { mutableStateOf(wishItem?.title ?: "") }
-    var productDescription by remember { mutableStateOf(wishItem?.description ?: "") }
-    var productSpecs by remember { mutableStateOf(wishItem?.specs ?: "") }
-    var productPrice by remember { mutableStateOf(wishItem?.price ?: "") }
-    var selectedTradeMethod by remember { mutableStateOf(wishItem?.payment ?: "") } // 預設空字串或第一個選項
-    var productNotes by remember { mutableStateOf(wishItem?.notes ?: "") }
-    var productOtherInfo by remember { mutableStateOf(wishItem?.other ?: "") }
-    var imageUri by remember { mutableStateOf<Uri?>(wishItem?.imageUri?.let { Uri.parse(it) }) }
+    // --- 【修改：還原為 LaunchedEffect 邏輯】 ---
+
+    // 1. 將所有狀態的預設值都設為空字串或 null
+    var productName by remember { mutableStateOf("") }
+    var productDescription by remember { mutableStateOf("") } // 您的 WishItem 中沒有 description
+    var productSpecs by remember { mutableStateOf("") } // 您的 WishItem 中沒有 specs
+    var productPrice by remember { mutableStateOf("") }
+    var selectedTradeMethod by remember { mutableStateOf("") } // 預設空字串
+    var productNotes by remember { mutableStateOf("") } // 您的 WishItem 中沒有 notes
+    var productOtherInfo by remember { mutableStateOf("") } // 您的 WishItem 中沒有 other
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+
+    // 2. 使用 LaunchedEffect(wishJson)
+    //    這會在 wishJson 參數「改變」時 (例如從 null 變為 "{...json...}") 觸發
+    LaunchedEffect(wishJson) {
+        Log.d("DataFlowDebug", "步驟 6: AddProductScreen 收到 wishJson = $wishJson")
+        val actualWishJson = if (wishJson == "null" || wishJson.isNullOrEmpty()) {
+            null
+        } else {
+            wishJson
+        }
+
+        if (actualWishJson != null) {
+            try {
+                // 3. 解析 JSON
+                val wishItem = Gson().fromJson(actualWishJson, WishItem::class.java)
+                Log.d("DataFlowDebug", "步驟 7: 成功解析 JSON，準備設定狀態...")
+                // 4. 【強制更新】所有狀態
+                //    (我們只更新 WishItem 中有的欄位)
+                productName = wishItem.title
+                productPrice = wishItem.price
+                productDescription = wishItem.description
+                productSpecs = wishItem.specs
+                selectedTradeMethod = wishItem.payment
+                productNotes = wishItem.notes
+                productOtherInfo = wishItem.other
+
+                if (wishItem.imageUri.isNotEmpty()) {
+                    imageUri = wishItem.imageUri.toUri()
+                }
+
+                // (註：您的 WishItem 中沒有 description, specs, notes, other，
+                //    所以它們會保持為空字串，這也是您在 AddProductScreen.kt 中
+                //    的原始邏輯)
+
+            } catch (e: Exception) {
+                Log.e("AddProductScreen", "Failed to parse wishJson: $wishJson", e)
+                Log.e("DataFlowDebug", "步驟 7 失敗: 解析 JSON 錯誤", e)
+            }
+        } else {
+            // 【重要】如果 wishJson 變回 null (例如用戶點了返回又點了上架)
+            // 我們需要重置表單，否則會顯示上一個「快速上架」的資料
+            Log.d("DataFlowDebug", "步驟 7 失敗: wishJson 為 null，重置表單")
+            productName = ""
+            productPrice = ""
+            selectedTradeMethod = ""
+            imageUri = null
+            productDescription = ""
+            productSpecs = ""
+            productNotes = ""
+            productOtherInfo = ""
+        }
+    }
+    // --- 【修改結束】 ---
+
     val imagePickerLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
             imageUri = uri
         }
     val tradeMethods = listOf("面交", "宅配", "超商取貨")
     var expanded by remember { mutableStateOf(false) }
-    // --- 狀態管理結束 ---
+
     MaterialTheme(colorScheme = SaleColorScheme) {
         Scaffold(
             topBar = {
@@ -91,21 +136,19 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                     title = {
                         Text(
                             text = "上架商品",
-                            color = MaterialTheme.colorScheme.onSurface, // 匹配 XML 顏色
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 20.sp
                         )
                     },
                     navigationIcon = {
-                        // 返回按鈕 (匹配 XML)
                         IconButton(onClick = { navController.navigate(Screen.Sale.route) }) {
                             Image(
-                                painter = painterResource(id = R.drawable.a_1_back_buttom), // 使用 XML 的 drawable
+                                painter = painterResource(id = R.drawable.a_1_back_buttom),
                                 contentDescription = "返回"
                             )
                         }
                     },
                     actions = {
-                        // 我要許願按鈕 (匹配 XML 的 ImageButton11)
                         Button(onClick = { navController.navigate(Screen.AddWish.route) },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800))) {
                             Text("我要許願" ,
@@ -120,20 +163,20 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding) // 套用 Scaffold 的 padding
-                    .padding(horizontal = 16.dp) // 加入左右邊距
+                    .padding(innerPadding)
+                    .padding(horizontal = 16.dp)
                     .background(MaterialTheme.colorScheme.background)
                     .verticalScroll(scrollState)
             ) {
-                Spacer(modifier = Modifier.height(24.dp)) // 頂部間距
+                Spacer(modifier = Modifier.height(24.dp))
 
-                // --- 圖片選擇區域 (匹配 XML 的 imageView18 + imageButton9) ---
+                // --- 圖片選擇區域 ---
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp) // 給定一個高度
+                        .height(200.dp)
                         .background(
-                            MaterialTheme.colorScheme.surfaceVariant, // 淺色背景
+                            MaterialTheme.colorScheme.surfaceVariant,
                             RoundedCornerShape(8.dp)
                         )
                         .clickable { imagePickerLauncher.launch("image/*") },
@@ -147,16 +190,14 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        // 顯示預設圖示和上傳按鈕 (類似 XML)
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
                                 imageVector = Icons.Default.AddPhotoAlternate,
                                 contentDescription = "選擇圖片",
                                 modifier = Modifier.size(50.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) // 灰色
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
-                            // 您可以放一個 Text 或 ImageButton 來模擬 XML 的上傳按鈕
                             Text(
                                 "點擊上傳圖片",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
@@ -165,7 +206,7 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp)) // 間距
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // --- 輸入欄位 (使用 OutlinedTextField) ---
 
@@ -173,7 +214,7 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                 OutlinedTextField(
                     value = productName,
                     onValueChange = { productName = it },
-                    label = { Text("上架商品名稱*") }, // 匹配 XML 文字
+                    label = { Text("上架商品名稱*") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     singleLine = true
@@ -184,8 +225,8 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                 OutlinedTextField(
                     value = productDescription,
                     onValueChange = { productDescription = it },
-                    label = { Text("商品描述") }, // 匹配 XML 文字
-                    modifier = Modifier.fillMaxWidth().height(120.dp), // 給定多行高度
+                    label = { Text("商品描述") },
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -194,8 +235,8 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                 OutlinedTextField(
                     value = productSpecs,
                     onValueChange = { productSpecs = it },
-                    label = { Text("商品規格") }, // 匹配 XML 文字
-                    modifier = Modifier.fillMaxWidth().height(120.dp), // 給定多行高度
+                    label = { Text("商品規格") },
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -204,24 +245,24 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                 OutlinedTextField(
                     value = productPrice,
                     onValueChange = { productPrice = it },
-                    label = { Text("商品價格*") }, // 匹配 XML 文字
+                    label = { Text("商品價格*") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Number,
                         imeAction = ImeAction.Next
                     ),
                     singleLine = true,
-                    leadingIcon = { Text("NT$") } // 加上貨幣符號提示
+                    leadingIcon = { Text("NT$") }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 交易方式下拉選單 (保留您原有的)
+                // 交易方式下拉選單
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = !expanded }
                 ) {
                     OutlinedTextField(
-                        value = selectedTradeMethod.ifEmpty { "請選擇交易方式*" }, // 提示文字
+                        value = selectedTradeMethod.ifEmpty { "請選擇交易方式*" },
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("交易方式*") },
@@ -262,12 +303,12 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                     keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
                 )
 
-                Spacer(modifier = Modifier.height(32.dp)) // 底部按鈕前的間距
+                Spacer(modifier = Modifier.height(32.dp))
 
                 // --- 上架按鈕 ---
                 Button(
                     onClick = {
-                        // 保留您原有的驗證和儲存邏輯
+                        // (上架邏輯保持不變)
                         if (productName.isBlank() || productPrice.isBlank() || selectedTradeMethod.isBlank()) {
                             Toast.makeText(context, "請填寫所有必填欄位 (*)", Toast.LENGTH_SHORT)
                                 .show()
@@ -279,18 +320,11 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                         }
                         scope.launch(Dispatchers.IO) {
                             try {
-                                // --- 修改開始：處理圖片 URI ---
-                                // 1. 判斷是否有選擇圖片 (imageUri 是否不為 null)
-                                // 2. 如果有，呼叫 saveImageToInternalStorage 將圖片複製並取得新 URI
-                                // 3. 如果沒有選擇圖片，或複製失敗，則使用空字串
                                 val finalImageUriString = imageUri?.let { uri ->
                                     saveImageToInternalStorage(context, uri)
                                 } ?: ""
-                                // --- 修改結束 ---
 
-                                // 建立 ProductItem 時，使用複製後的 finalImageUriString
                                 val newProduct = ProductItem(
-                                    // id = ... (如果您有加入 id 欄位，它會自動產生)
                                     title = productName,
                                     description = productDescription,
                                     specs = productSpecs,
@@ -298,15 +332,15 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                                     payment = selectedTradeMethod,
                                     notes = productNotes,
                                     other = productOtherInfo,
-                                    imageUri = finalImageUriString // <-- 使用複製後的永久 URI
+                                    imageUri = finalImageUriString
                                 )
 
-                                productRepository.addProduct(newProduct) //
+                                productRepository.addProduct(newProduct)
 
                                 withContext(Dispatchers.Main) {
                                     Toast.makeText(context, "商品已成功上架", Toast.LENGTH_SHORT)
                                         .show()
-                                    navController.navigate(Screen.Sale.route) { //
+                                    navController.navigate(Screen.Sale.route) {
                                         popUpTo(Screen.Sale.route) { inclusive = true }
                                     }
                                 }
@@ -322,7 +356,6 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
-                    // --- 使用主題次要色 ---
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.secondary
                     )
@@ -334,7 +367,7 @@ fun AddProductScreen(navController: NavController, wishJson: String? = null) {
 
                 }
 
-                Spacer(modifier = Modifier.height(16.dp)) // 確保滾動到底部時有空間
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }

@@ -15,7 +15,7 @@ sealed class Screen(val route: String) {
     object Sale : Screen("sale_screen")
 
     object WishList : Screen("wish_list_screen")
-    object AddProduct : Screen("add_product?wishJson={wishJson}")
+    object AddProduct : Screen("add_product?wishUuid={wishUuid}")
     object AddWish : Screen("add_wish_screen")
     // 您未來可以從這裡擴充，例如：
     // object Profile : Screen("profile_screen")

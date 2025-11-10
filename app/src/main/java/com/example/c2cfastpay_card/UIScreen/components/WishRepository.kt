@@ -68,7 +68,10 @@ class WishRepository(private val context: Context) {
         val type = object : TypeToken<List<WishItem>>() {}.type
         return gson.fromJson(json, type)
     }
-
+    suspend fun getWishByUuid(uuid: String): WishItem? {
+        val allWishes = getWishList()
+        return allWishes.find { it.uuid == uuid }
+    }
     suspend fun clearWishList() {
         context.dataStore.edit { prefs ->
             prefs[KEY_WISH_LIST] = "[]"

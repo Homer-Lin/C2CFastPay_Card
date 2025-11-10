@@ -10,5 +10,6 @@ data class WishItem(
     val payment: String,
     val notes: String,
     val other: String,
-    val imageUri: String
+    val imageUri: String,
+    val uuid: String = UUID.randomUUID().toString() // <-- 欄位名稱是 uuid
 )
