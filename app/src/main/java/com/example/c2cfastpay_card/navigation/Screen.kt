@@ -18,5 +18,8 @@ sealed class Screen(val route: String) {
     object AddProduct : Screen("add_product?wishUuid={wishUuid}")
     object AddWish : Screen("add_wish_screen")
     // 您未來可以從這裡擴充，例如：
+    object Login : Screen("login_screen")
+    object Register : Screen("register_screen")
+    object ForgotPassword : Screen("forgot_password_screen")
     // object Profile : Screen("profile_screen")
 }

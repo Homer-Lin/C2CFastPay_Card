@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "632365191955",
+    "firebase_url": "https://c2cfastpay-default-rtdb.firebaseio.com",
+    "project_id": "c2cfastpay",
+    "storage_bucket": "c2cfastpay.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:632365191955:android:4f847eefd34e80cac7c0e6",
+        "android_client_info": {
+          "package_name": "com.example.c2cfastpay"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAbD0l4a1dii2YOUgcVP5idkasdhWg3UPw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:632365191955:android:8a413bba3239f2e7c7c0e6",
+        "android_client_info": {
+          "package_name": "com.example.c2cfastpay_card"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAbD0l4a1dii2YOUgcVP5idkasdhWg3UPw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

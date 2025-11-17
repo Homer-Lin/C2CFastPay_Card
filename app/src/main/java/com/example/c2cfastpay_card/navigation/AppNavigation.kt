@@ -23,6 +23,9 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.c2cfastpay_card.UIScreen.components.WishRepository
 import com.google.gson.Gson
 
+import com.example.c2cfastpay_card.UIScreen.Screens.LoginScreen
+import com.example.c2cfastpay_card.UIScreen.Screens.RegisterScreen
+import com.example.c2cfastpay_card.UIScreen.Screens.ForgotPasswordScreen
 /**
  * 這是「導航圖」(NavHost)。
  * 它就像一個「總控制器」，根據 NavController 的指令，決定現在該顯示哪個畫面。
@@ -34,8 +37,38 @@ fun AppNavigationGraph(
 ) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Sale.route // 設定 App 啟動時的第一個畫面
+        startDestination = Screen.Login.route // 設定 App 啟動時的第一個畫面
     ) {
+
+        composable(route = Screen.Login.route) {
+            LoginScreen(
+                navController = navController,
+                onSwitchToRegister = {
+                    navController.navigate(Screen.Register.route)
+                },
+                onForgetPasswordClick = {
+                    navController.navigate(Screen.ForgotPassword.route)
+                },
+            )
+        }
+
+        composable(route = Screen.Register.route) {
+            RegisterScreen(
+                navController = navController,
+                onSwitchToLogin = {
+                    navController.popBackStack() // 返回登入頁
+                }
+            )
+        }
+
+        composable(route = Screen.ForgotPassword.route) {
+            ForgotPasswordScreen(
+                navController = navController,
+                onConfirmSuccess = {
+                    navController.popBackStack() // 返回登入頁
+                }
+            )
+        }
         // --- 卡片堆疊 ---
         composable(route = Screen.CardStack.route) {
             CardStackScreen(navController = navController)
@@ -67,8 +100,6 @@ fun AppNavigationGraph(
             val context = LocalContext.current
             val wishRepository = remember { WishRepository(context) }
             val wishUuid = backStackEntry.arguments?.getString("wishUuid")
-            Log.d("DataFlowDebug", "步驟 2: AppNavigation 收到 Uuid = $wishUuid")
-            // 準備一個 state 來存放 wishJson，並標記是否加載中
             var wishJsonForScreen by remember { mutableStateOf<String?>(null) }
             var isLoading by remember { mutableStateOf(true) }
 
