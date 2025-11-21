@@ -41,16 +41,10 @@ fun WishPreviewPage(
 ) {
     val context = LocalContext.current
     val wishRepository = remember { WishRepository(context) }
-    var wishList by remember { mutableStateOf<List<WishItem>>(emptyList()) }
+    val wishList by wishRepository.getWishListFlow()
+        .collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
-    val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(lifecycleOwner) {
-        scope.launch {
-            lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                wishList = wishRepository.getWishList()
-            }
-        }
-    }
+
     Scaffold(
         bottomBar = {
             // --- 8. 在 bottomBar 插槽中呼叫共用的導覽列 ---
@@ -173,12 +167,8 @@ fun WishPreviewPage(
             ) {
                 items(
                     count = wishList.size,
-                    key = { index ->
-                        // 2. 根據索引(index)找到 wish，並使用其 id 作為 key
-                        wishList[index].uuid //
-                    }
+                    key = { index -> wishList[index].uuid } // 確保 uuid 正確
                 ) { index ->
-                    // 3. 取得該索引的 wish 物件
                     val wish = wishList[index]
                     Card(
                         modifier = Modifier
@@ -194,7 +184,7 @@ fun WishPreviewPage(
                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
                             if (wish.imageUri.isNotEmpty()) {
                                 Image(
-                                    painter = rememberAsyncImagePainter(wish.imageUri.toUri()),
+                                    painter = rememberAsyncImagePainter(model = wish.imageUri),
                                     contentDescription = null,
                                     modifier = Modifier
                                         .size(120.dp)

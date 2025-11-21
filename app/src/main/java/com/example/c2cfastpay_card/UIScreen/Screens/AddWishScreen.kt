@@ -14,7 +14,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack // 使用 AutoMirrored
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,17 +24,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
-import com.example.c2cfastpay_card.R
 import com.example.c2cfastpay_card.UIScreen.components.WishRepository
-import com.example.c2cfastpay_card.navigation.Screen // 匯入 Screen
-import com.example.c2cfastpay_card.ui.theme.WishColorScheme // <-- 匯入 Wish 配色
+import com.example.c2cfastpay_card.navigation.Screen
+// 1. 確保有導入 WishItem 和 UUID
+import com.example.c2cfastpay_card.UIScreen.components.WishItem
+import java.util.UUID
+// 如果 WishColorScheme 報錯，請改回 C2CFastPay_CardTheme 或確認 Theme.kt 有定義
+import com.example.c2cfastpay_card.ui.theme.WishColorScheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,7 +52,7 @@ fun AddWishScreen(navController: NavController) {
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
 
-    // --- 狀態管理 (來自您原本的 Compose 程式碼) ---
+    // --- 狀態管理 ---
     var wishTitle by remember { mutableStateOf("") }
     var wishDescription by remember { mutableStateOf("") }
     var wishSpecs by remember { mutableStateOf("") }
@@ -58,29 +60,28 @@ fun AddWishScreen(navController: NavController) {
     var wishNotes by remember { mutableStateOf("") }
     var wishOtherInfo by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         imageUri = uri
     }
     val tradeMethods = listOf("面交", "宅配", "超商取貨")
     var expanded by remember { mutableStateOf(false) }
-    var selectedTradeMethod by remember { mutableStateOf("") } // 預設空字串或第一個選項
+    var selectedTradeMethod by remember { mutableStateOf("") }
     // --- 狀態管理結束 ---
 
-    MaterialTheme(colorScheme = WishColorScheme) { // <-- 套用 Wish 配色主題
+    MaterialTheme(colorScheme = WishColorScheme) {
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = {
                         Text(
                             text = "新增許願",
-                            color = MaterialTheme.colorScheme.onSurface, // 使用主題顏色
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 20.sp
                         )
                     },
                     navigationIcon = {
-                        // 返回按鈕
                         IconButton(onClick = {navController.navigate(Screen.Sale.route) }) {
-                            // 直接使用 Icon，Compose 會處理 AutoMirrored
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "返回"
@@ -88,44 +89,38 @@ fun AddWishScreen(navController: NavController) {
                         }
                     },
                     actions = {
-                        // 上架商品按鈕
+                        // 這裡的導航建議使用 Screen.AddProduct.route
                         Button(
-                            onClick = { navController.navigate("add_product") }, // 確保傳遞 null 或空字串
-                            // 可以考慮使用 Sale 的主題色或其他強調色
+                            onClick = { navController.navigate(Screen.AddProduct.route) },
                             colors = ButtonDefaults.buttonColors(Color(0xFF487F81))
                         ) {
                             Text(
                                 "我要上架",
-                                color = Color.White, // 使用主題顏色
+                                color = Color.White,
                                 fontSize = 18.sp
                             )
                         }
-                    },
-                    // 可以選擇性地為 TopAppBar 添加背景色
-//                    colors = TopAppBarDefaults.topAppBarColors(
-//                        containerColor = MaterialTheme.colorScheme.primaryContainer
-//                    )
+                    }
                 )
             }
         ) { innerPadding ->
-            // --- 可滾動的表單內容 ---
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding) // 套用 Scaffold 的 padding
-                    .padding(horizontal = 16.dp) // 加入左右邊距
+                    .padding(innerPadding)
+                    .padding(horizontal = 16.dp)
                     .background(MaterialTheme.colorScheme.background)
                     .verticalScroll(scrollState)
             ) {
-                Spacer(modifier = Modifier.height(24.dp)) // 頂部間距
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // --- 圖片選擇區域 ---
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp) // 給定一個高度
+                        .height(200.dp)
                         .background(
-                            MaterialTheme.colorScheme.surfaceVariant, // 使用主題的淺色背景
+                            MaterialTheme.colorScheme.surfaceVariant,
                             RoundedCornerShape(8.dp)
                         )
                         .clickable { imagePickerLauncher.launch("image/*") },
@@ -139,28 +134,25 @@ fun AddWishScreen(navController: NavController) {
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        // 顯示預設圖示和文字
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
                                 imageVector = Icons.Default.AddPhotoAlternate,
                                 contentDescription = "選擇圖片",
                                 modifier = Modifier.size(50.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) // 使用主題的灰色調
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 "點擊上傳圖片",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f) // 使用主題的文字顏色
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp)) // 間距
+                Spacer(modifier = Modifier.height(24.dp))
 
-                // --- 輸入欄位 (使用 OutlinedTextField) ---
-
-                // 許願商品名稱 (帶*號)
+                // --- 輸入欄位 ---
                 OutlinedTextField(
                     value = wishTitle,
                     onValueChange = { wishTitle = it },
@@ -171,48 +163,45 @@ fun AddWishScreen(navController: NavController) {
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 許願商品描述
                 OutlinedTextField(
                     value = wishDescription,
                     onValueChange = { wishDescription = it },
                     label = { Text("許願商品描述") },
-                    modifier = Modifier.fillMaxWidth().height(120.dp), // 給定多行高度
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 許願商品規格
                 OutlinedTextField(
                     value = wishSpecs,
                     onValueChange = { wishSpecs = it },
                     label = { Text("許願商品規格") },
-                    modifier = Modifier.fillMaxWidth().height(120.dp), // 給定多行高度
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 許願商品價格 (帶*號)
                 OutlinedTextField(
                     value = wishPrice,
                     onValueChange = { wishPrice = it },
-                    label = { Text("期望價格*") }, // 修改標籤文字
+                    label = { Text("期望價格*") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Number,
                         imeAction = ImeAction.Next
                     ),
                     singleLine = true,
-                    leadingIcon = { Text("NT$") } // 加上貨幣符號提示
+                    leadingIcon = { Text("NT$") }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 交易方式下拉選單
+                // 交易方式
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = !expanded }
                 ) {
                     OutlinedTextField(
-                        value = selectedTradeMethod.ifEmpty { "請選擇交易方式*" }, // 提示文字
+                        value = selectedTradeMethod.ifEmpty { "請選擇交易方式*" },
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("交易方式*") },
@@ -233,7 +222,6 @@ fun AddWishScreen(navController: NavController) {
                 }
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 注意事項
                 OutlinedTextField(
                     value = wishNotes,
                     onValueChange = { wishNotes = it },
@@ -243,7 +231,6 @@ fun AddWishScreen(navController: NavController) {
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 其他
                 OutlinedTextField(
                     value = wishOtherInfo,
                     onValueChange = { wishOtherInfo = it },
@@ -253,16 +240,15 @@ fun AddWishScreen(navController: NavController) {
                     keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
                 )
 
-                Spacer(modifier = Modifier.height(32.dp)) // 底部按鈕前的間距
+                Spacer(modifier = Modifier.height(32.dp))
 
-                // --- 新增許願按鈕 ---
+                // --- 新增許願按鈕 (關鍵修改部分) ---
                 Button(
                     onClick = {
-                        // 保留您原有的驗證和儲存邏輯
                         scope.launch(Dispatchers.IO) {
                             val isValid = wishTitle.isNotBlank() &&
-                                    wishPrice.isNotBlank() && // 價格也不能為空
-                                    wishPrice.toDoubleOrNull() != null && // 價格必須是數字
+                                    wishPrice.isNotBlank() &&
+                                    wishPrice.toDoubleOrNull() != null &&
                                     selectedTradeMethod.isNotBlank()
 
                             if (!isValid) {
@@ -273,37 +259,34 @@ fun AddWishScreen(navController: NavController) {
                             }
 
                             try {
-                                // --- 處理圖片 URI (這部分不變) ---
+                                // 1. 儲存圖片到內部空間 (可選，為了取得路徑)
+                                // 如果您希望上傳到 Firebase Storage，WishRepository.addWish 已經有處理
+                                // 這裡我們只需要取得 URI 字串傳給它
                                 val finalImageUriString = imageUri?.let { uri ->
                                     saveImageToInternalStorage(context, uri)
-                                }
-                                // --- 處理結束 ---
+                                } ?: ""
 
-                                // --- 修改開始：將 String? 轉換回 Uri? ---
-                                // 我們的 saveImageToInternalStorage 回傳的是 String?
-                                // 但 wishRepository.saveWishData 預期的是 Uri?
-                                // 所以我們需要將 String? 解析(parse)回 Uri?
-                                val finalImageUri: Uri? = finalImageUriString?.let { uriString ->
-                                    Uri.parse(uriString) // Uri.parse() 會將 "file:///..." 字串轉回 Uri 物件
-                                }
-                                // --- 修改結束 ---
-
-                                // --- 傳遞轉換後的 finalImageUri ---
-                                wishRepository.saveWishData(
-                                    wishTitle,
-                                    wishDescription,
-                                    wishSpecs,
-                                    wishPrice,
-                                    selectedTradeMethod,
-                                    wishNotes,
-                                    wishOtherInfo,
-                                    finalImageUri // <-- 使用轉換後的永久 Uri (或 null)
+                                // 2. 【修正】建立 WishItem 物件
+                                // 包含所有新欄位，並手動生成 UUID 防止 null 錯誤
+                                val newWish = WishItem(
+                                    title = wishTitle,
+                                    description = wishDescription, // 新增欄位
+                                    specs = wishSpecs,             // 新增欄位
+                                    price = wishPrice,
+                                    payment = selectedTradeMethod,
+                                    notes = wishNotes,             // 新增欄位
+                                    other = wishOtherInfo,         // 新增欄位
+                                    imageUri = finalImageUriString,
+                                    uuid = UUID.randomUUID().toString() // 【關鍵】生成 UUID
                                 )
+
+                                // 3. 【修正】呼叫新版 addWish
+                                wishRepository.addWish(newWish)
+
                                 withContext(Dispatchers.Main) {
                                     Toast.makeText(context, "願望已成功新增", Toast.LENGTH_SHORT).show()
                                     navController.navigate(Screen.WishList.route) {
-                                        // 清除返回堆疊，避免用戶按返回又回到新增頁面
-                                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                                        popUpTo(navController.graph.startDestinationId) { inclusive = false }
                                         launchSingleTop = true
                                     }
                                 }
@@ -315,18 +298,17 @@ fun AddWishScreen(navController: NavController) {
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
-                    // --- 使用主題主要色 ---
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.onPrimary // Wish 主色
+                        containerColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
                     Text(
                         "新增許願", fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onSecondary // Wish 主色上的文字顏色
+                        color = MaterialTheme.colorScheme.onSecondary
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp)) // 確保滾動到底部時有空間
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
