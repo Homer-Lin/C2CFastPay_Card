@@ -1,5 +1,3 @@
-// 【修正 1：修改 Package 名稱】
-// 原本是 package com.example.c2cfastpay
 package com.example.c2cfastpay_card.UIScreen.Screens
 
 import androidx.compose.runtime.getValue
@@ -7,7 +5,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.c2cfastpay_card.data.User // 【新增】導入 User 模型
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore // 【新增】導入 Firestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
@@ -23,7 +23,8 @@ class RegisterViewModel : ViewModel() {
     var isLoading by mutableStateOf(false)
 
     fun updateEmail(email: String) {
-        this.email = email
+        // 使用 trim() 移除前後空白，避免使用者誤觸空白鍵導致驗證失敗
+        this.email = email.trim()
         checkRegistrationValidity()
     }
 
@@ -43,7 +44,7 @@ class RegisterViewModel : ViewModel() {
     }
 
     private fun checkRegistrationValidity() {
-        val isEmailValid = email.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
+        val isEmailValid = email.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
         val isPasswordValid = password.length >= 6
         val isConfirmPasswordValid = password == confirmPassword
         isRegisterEnabled = isEmailValid && isPasswordValid && isConfirmPasswordValid && privacyPolicyChecked
@@ -51,10 +52,9 @@ class RegisterViewModel : ViewModel() {
             !isEmailValid && email.isNotEmpty() -> "請輸入有效的信箱"
             !isPasswordValid && password.isNotEmpty() -> "密碼需至少 6 個字元"
             !isConfirmPasswordValid && confirmPassword.isNotEmpty() -> "密碼不一致"
-            !privacyPolicyChecked -> "請勾選隱私條款" // 這裡只是邏輯判斷，UI 顯示可能不同
+            !privacyPolicyChecked -> "請勾選隱私條款"
             else -> ""
         }
-        // 如果全空則不顯示錯誤
         if(email.isEmpty() && password.isEmpty() && confirmPassword.isEmpty()) errorMessage = ""
     }
 
@@ -65,17 +65,35 @@ class RegisterViewModel : ViewModel() {
             viewModelScope.launch {
                 try {
                     val auth = FirebaseAuth.getInstance()
+                    val db = FirebaseFirestore.getInstance() // 【新增】取得 Firestore 實例
+
+                    // 1. 建立 Auth 帳號
                     val result = auth.createUserWithEmailAndPassword(email, password).await()
-                    // 發送驗證郵件
-                    result.user?.sendEmailVerification()?.await()
-                    val user = auth.currentUser
-                    withContext(Dispatchers.Main) {
-                        isLoading = false
-                        if (user?.isEmailVerified == true) {
-                            onSuccess()
-                        } else {
+                    val firebaseUser = result.user
+
+                    if (firebaseUser != null) {
+                        // 2. 【關鍵修改】建立 User 資料並寫入 Firestore
+                        val newUser = User(
+                            id = firebaseUser.uid,
+                            email = email,
+                            // 暫時用 email @ 前面的字當預設暱稱
+                            name = email.substringBefore("@"),
+                            avatarUrl = "" // 暫時留空
+                        )
+
+                        // 寫入 "users" 集合，文件 ID 就是用戶的 UID
+                        db.collection("users")
+                            .document(firebaseUser.uid)
+                            .set(newUser)
+                            .await()
+
+                        // 3. 發送驗證郵件
+                        firebaseUser.sendEmailVerification().await()
+
+                        withContext(Dispatchers.Main) {
+                            isLoading = false
+                            // 這裡邏輯不變：雖然寫入資料庫了，但還是要等他驗證信箱
                             errorMessage = "驗證郵件已發送，請檢查信箱並點擊連結完成驗證"
-                            // 不直接調用 onSuccess，等待用戶驗證
                         }
                     }
                 } catch (e: Exception) {

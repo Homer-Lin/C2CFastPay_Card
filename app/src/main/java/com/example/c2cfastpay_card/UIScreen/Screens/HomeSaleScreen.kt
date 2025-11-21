@@ -23,11 +23,7 @@ import com.example.c2cfastpay_card.R
 import com.example.c2cfastpay_card.UIScreen.components.BottomNavigationBar
 import com.example.c2cfastpay_card.UIScreen.components.ProductRepository
 import com.example.c2cfastpay_card.navigation.Screen
-
-import androidx.core.net.toUri
-import com.example.c2cfastpay_card.UIScreen.components.ProductItem
-import kotlinx.coroutines.launch
-import androidx.compose.material3.Scaffold
+import com.example.c2cfastpay_card.UIScreen.components.ProductItem // 確保有這個 import
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,20 +32,18 @@ fun SaleProductPage(
 ) {
     val context = LocalContext.current
     val productRepository = remember { ProductRepository(context) }
-    var productList by remember { mutableStateOf<List<ProductItem>>(emptyList()) }
-    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        scope.launch {
-            productList = productRepository.getProductList()
-        }
-    }
+    // --- 【修正 1】改用 collectAsState 監聽 Firestore 資料流 ---
+    // 這樣當有人上架新商品時，畫面會自動更新
+    val productList by productRepository.getAllProducts()
+        .collectAsState(initial = emptyList())
+    // -------------------------------------------------------
+
     Scaffold(
         bottomBar = {
-            // 4. 在 bottomBar 插槽中呼叫您的導覽列
             BottomNavigationBar(navController = navController)
         }
-    ) { innerPadding -> // 5. Scaffold 會提供 innerPadding
+    ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -82,7 +76,7 @@ fun SaleProductPage(
 
             // SALE 按鈕
             IconButton(
-                onClick = { /* TODO: 導航到特價 */ },
+                onClick = { /* 當前頁面 */ },
                 modifier = Modifier
                     .size(60.dp)
                     .align(Alignment.TopCenter)
@@ -111,7 +105,6 @@ fun SaleProductPage(
                     contentScale = ContentScale.Fit
                 )
             }
-
 
             // 搜尋列 + 切換圖示
             Row(
@@ -143,7 +136,7 @@ fun SaleProductPage(
                 }
                 Spacer(Modifier.width(12.dp))
                 IconButton(
-                    onClick = { /* TODO: 執行搜尋 */ },
+                    onClick = { /* TODO: 切換視圖 */ },
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
@@ -153,7 +146,7 @@ fun SaleProductPage(
                 }
             }
 
-            // 商品列表，依照 HomeSaleScreen.kt 呈現
+            // 商品列表
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -176,8 +169,9 @@ fun SaleProductPage(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (product.imageUri.isNotEmpty()) {
+                                // --- 【修正 2】直接載入 Storage 網址 ---
                                 Image(
-                                    painter = rememberAsyncImagePainter(product.imageUri.toUri()),
+                                    painter = rememberAsyncImagePainter(model = product.imageUri),
                                     contentDescription = "商品圖片",
                                     modifier = Modifier
                                         .size(80.dp)
@@ -201,7 +195,6 @@ fun SaleProductPage(
                                     fontSize = 16.sp,
                                     color = Color.Red
                                 )
-
                             }
                         }
                     }
