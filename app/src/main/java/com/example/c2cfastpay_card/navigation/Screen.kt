@@ -21,5 +21,6 @@ sealed class Screen(val route: String) {
 
     object ProductDetail : Screen("product_detail/{productId}")
     object Cart : Screen("cart_screen")
+    object Chat : Screen("chat_screen/{matchId}")
     // object Profile : Screen("profile_screen")
 }

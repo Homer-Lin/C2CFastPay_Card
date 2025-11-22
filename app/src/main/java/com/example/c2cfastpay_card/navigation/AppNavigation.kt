@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.example.c2cfastpay_card.UIScreen.Screens.CartScreen
+import com.example.c2cfastpay_card.UIScreen.Screens.ChatScreen
 import com.example.c2cfastpay_card.UIScreen.components.WishRepository
 import com.google.gson.Gson
 
@@ -156,6 +157,20 @@ fun AppNavigationGraph(
         composable(route = Screen.Cart.route) {
             CartScreen(navController = navController)
         }
+        composable(
+            route = Screen.Chat.route,
+            arguments = listOf(navArgument("matchId") {
+                type = NavType.StringType
+            })
+        ) { backStackEntry ->
+            // 取得傳遞過來的 matchId
+            val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
 
+            // 顯示聊天室
+            ChatScreen(
+                navController = navController,
+                matchId = matchId
+            )
+        }
     }
 }
