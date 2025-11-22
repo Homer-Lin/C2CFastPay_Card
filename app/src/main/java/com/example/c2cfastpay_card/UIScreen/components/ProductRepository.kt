@@ -89,17 +89,27 @@ class ProductRepository(private val context: Context) { // Context 雖然這裡�
      * 2. 取得「所有」商品 (改為 Flow 以便即時更新)
      * 這裡可以用來在首頁顯示
      */
-    fun getAllProducts(): Flow<List<ProductItem>> = flow {
-        try {
-            val snapshot = db.collection("products")
-                .orderBy("timestamp", Query.Direction.DESCENDING)
-                .get()
-                .await()
+    fun getAllProducts(searchQuery: String = ""): Flow<List<ProductItem>> = flow {
+        val query = db.collection("products")
+            .orderBy("timestamp", Query.Direction.DESCENDING)
 
+        // 如果有搜尋字，進行篩選 (這裡使用簡單的 title 範圍搜尋)
+        val finalQuery = if (searchQuery.isNotBlank()) {
+            // 注意：Firestore 的範圍搜尋限制較多，這裡示範基本的前綴搜尋
+            // 若要更強大的搜尋通常需要第三方服務 (如 Algolia)
+            db.collection("products")
+                .whereGreaterThanOrEqualTo("title", searchQuery)
+                .whereLessThanOrEqualTo("title", searchQuery + "\uf8ff")
+                .orderBy("title", Query.Direction.ASCENDING)
+        } else {
+            query
+        }
+
+        try {
+            val snapshot = finalQuery.get().await()
             val products = snapshot.toObjects(ProductItem::class.java)
             emit(products)
         } catch (e: Exception) {
-            // 【新增】錯誤處理：印出錯誤 Log，並回傳空列表，防止崩潰
             Log.e("ProductRepository", "讀取商品失敗", e)
             emit(emptyList())
         }

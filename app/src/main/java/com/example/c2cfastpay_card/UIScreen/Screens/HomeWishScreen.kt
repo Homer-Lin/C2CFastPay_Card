@@ -1,7 +1,5 @@
 package com.example.c2cfastpay_card.UIScreen.Screens
 
-import android.net.Uri
-import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,6 +7,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,22 +18,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.c2cfastpay_card.R
 import com.example.c2cfastpay_card.UIScreen.components.BottomNavigationBar
-import com.example.c2cfastpay_card.UIScreen.components.WishItem
 import com.example.c2cfastpay_card.UIScreen.components.WishRepository
 import com.example.c2cfastpay_card.navigation.Screen
-import androidx.core.net.toUri
-import kotlinx.coroutines.launch
-import androidx.navigation.NavController
-import com.google.gson.Gson
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.repeatOnLifecycle
-import androidx.compose.ui.platform.LocalLifecycleOwner
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,26 +36,27 @@ fun WishPreviewPage(
 ) {
     val context = LocalContext.current
     val wishRepository = remember { WishRepository(context) }
-    val wishList by wishRepository.getWishListFlow()
+
+    var searchQuery by remember { mutableStateOf("") }
+
+    // 使用 Flow 監聽資料
+    val wishList by wishRepository.getWishListFlow(searchQuery = searchQuery)
         .collectAsState(initial = emptyList())
-    val scope = rememberCoroutineScope()
+
+    val primaryColor = Color(0xFFFBC02D) // 許願牆主題色 (黃色系)
 
     Scaffold(
         bottomBar = {
-            // --- 8. 在 bottomBar 插槽中呼叫共用的導覽列 ---
             BottomNavigationBar(navController = navController)
         }
-    ) { innerPadding -> // --- 9. Scaffold 提供 innerPadding ---
-
-        // --- 10. 將您原本的 Box 放在 Scaffold 內容區塊 ---
-        //      並套用 innerPadding
+    ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(bottom = innerPadding.calculateBottomPadding())
                 .background(Color.White)
         ) {
-            // 背景 and tabs (reuse from sale)
+            // --- 底層：背景圖 ---
             Image(
                 painter = painterResource(R.drawable.background_of_wishing_page),
                 contentDescription = null,
@@ -68,24 +64,12 @@ fun WishPreviewPage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(240.dp)
+                    .align(Alignment.TopCenter)
             )
 
-            // 購物車按鈕
-            IconButton(
-                onClick = { /* TODO: 導航到購物車 */ },
-                modifier = Modifier
-                    .size(35.dp)
-                    .align(Alignment.TopEnd)
-                    .padding(top = 56.dp, end = 16.dp)
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.cart_button),
-                    contentDescription = "Cart"
-                )
-            }
+            // --- 中層：頁面內容 ---
 
-            // TabRow: SALE / WISH
-            // SALE 按鈕
+            // SALE 按鈕 (位置與 HomeSaleScreen 保持對稱)
             IconButton(
                 onClick = { navController.navigate(Screen.Sale.route) },
                 modifier = Modifier
@@ -103,7 +87,7 @@ fun WishPreviewPage(
 
             // WISH 按鈕
             IconButton(
-                onClick = { /* 已經在此頁面，不需動作 */ },
+                onClick = { /* 當前頁面 */ },
                 modifier = Modifier
                     .size(60.dp)
                     .align(Alignment.TopCenter)
@@ -117,72 +101,92 @@ fun WishPreviewPage(
                 )
             }
 
-            // 搜尋列 + 切換
+            // 搜尋列
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 150.dp)
                     .fillMaxWidth(0.9f)
-                    .height(50.dp)
+                    .height(45.dp) // 高度設定與 HomeSaleScreen 一致
             ) {
-                Image(
-                    painter = painterResource(R.drawable.search_bar02),
-                    contentDescription = null,
-                    contentScale = ContentScale.FillHeight,
+                OutlinedTextField(
+                    value = searchQuery,
+                    // 【修正】明確指定參數名稱，解決 "Cannot infer type" 錯誤
+                    onValueChange = { newText: String -> searchQuery = newText },
+                    label = {
+                        Text(
+                            "搜尋商品...",
+                            style = TextStyle(fontSize = 14.sp)
+                        )
+                    },
+                    textStyle = TextStyle(fontSize = 14.sp),
+                    singleLine = true,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "搜尋",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     modifier = Modifier
-                        .weight(1.3f)
-                        .fillMaxHeight()
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White.copy(alpha = 0.9f),
+                        unfocusedContainerColor = Color.White.copy(alpha = 0.9f),
+                        focusedBorderColor = primaryColor,
+                        unfocusedBorderColor = Color.LightGray,
+                    ),
+                    shape = RoundedCornerShape(24.dp)
+                    // 【修正】移除了不支援的 contentPadding 參數
                 )
-                IconButton(
-                    onClick = { /* TODO: 執行搜尋 */ },
-                    modifier = Modifier
-                        .size(32.dp)
-                        .offset(x = (-40).dp)
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.search_button02),
-                        contentDescription = "Search"
-                    )
-                }
+
                 Spacer(Modifier.width(12.dp))
+
                 IconButton(
-                    onClick = { /* TODO: 切換網格 */ },
+                    onClick = { /* 切換檢視 */ },
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.img_7),
-                        contentDescription = "Toggle View"
+                        contentDescription = "Toggle View",
+                        tint = primaryColor
                     )
                 }
             }
 
-
-            // 許願列表預覽
+            // 許願列表
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 200.dp, bottom = 56.dp),
+                    .padding(top = 220.dp), // 避開上方搜尋列
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 items(
-                    count = wishList.size,
-                    key = { index -> wishList[index].uuid } // 確保 uuid 正確
-                ) { index ->
-                    val wish = wishList[index]
+                    items = wishList,
+                    key = { wish -> wish.uuid }
+                ) { wish ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                             .clickable {
-                                // 顯示詳細視窗
+                                // 未來可導航到許願詳情
                             },
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFDF0DF)),
                         shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFDF0DF)),
                         elevation = CardDefaults.cardElevation(4.dp)
                     ) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
                             if (wish.imageUri.isNotEmpty()) {
+                                // 直接使用 Coil 載入網址
                                 Image(
                                     painter = rememberAsyncImagePainter(model = wish.imageUri),
                                     contentDescription = null,
@@ -203,14 +207,11 @@ fun WishPreviewPage(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Button(
                                     onClick = {
-                                        val wishUuid = wish.uuid //
-                                        Log.d("DataFlowDebug", "步驟 1: 正在導航... Uuid = $wishUuid")
+                                        val wishUuid = wish.uuid
                                         navController.navigate("add_product?wishUuid=$wishUuid")
                                     },
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(
-                                            0xFFFF9800
-                                        )
+                                        containerColor = Color(0xFFFF9800)
                                     ),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
@@ -221,6 +222,27 @@ fun WishPreviewPage(
                     }
                 }
             }
+
+            // --- 頂層：透明標題列與購物車 (Layer On Top) ---
+            TopAppBar(
+                title = { }, // 留空
+                navigationIcon = {},
+                actions = {
+                    IconButton(onClick = { navController.navigate(Screen.Cart.route) }) {
+                        Icon(
+                            imageVector = Icons.Default.ShoppingCart,
+                            contentDescription = "購物車",
+                            tint = Color.White // 白色圖示，確保在背景圖上清晰可見
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                ),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+            )
         }
     }
 }

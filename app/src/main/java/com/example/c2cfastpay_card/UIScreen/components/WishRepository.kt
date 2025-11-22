@@ -66,15 +66,26 @@ class WishRepository(private val context: Context) {
     }
 
     /**
-     * 2. 取得許願清單 (即時監聽 Flow)
+     * 2. 取得許願清單 (即時監聽 Flow，支援搜尋)
+     * 【關鍵修改】這裡必須加入 searchQuery 參數
      */
-    fun getWishListFlow(): Flow<List<WishItem>> = callbackFlow {
-        // (移除了 userId 檢查，因為我們不需要只抓自己的)
+    fun getWishListFlow(searchQuery: String = ""): Flow<List<WishItem>> = callbackFlow {
+        val userId = getCurrentUserId()
 
-        val registration = db.collection("wishes")
-            // ❌ 移除這一行，這樣就能看到所有人的願望了
-            // .whereEqualTo("ownerId", userId)
-            .orderBy("timestamp", Query.Direction.DESCENDING)
+        var baseQuery = db.collection("wishes")
+
+        // 如果搜尋關鍵字不為空，則加入篩選條件
+        val finalQuery = if (searchQuery.isNotBlank()) {
+            // 使用前綴搜尋
+            baseQuery.whereGreaterThanOrEqualTo("title", searchQuery)
+                .whereLessThanOrEqualTo("title", searchQuery + "\uf8ff")
+                .orderBy("title", Query.Direction.ASCENDING)
+        } else {
+            // 否則使用原本的時間排序
+            baseQuery.orderBy("timestamp", Query.Direction.DESCENDING)
+        }
+
+        val registration = finalQuery
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
                     Log.w("WishRepository", "Listen failed.", e)
@@ -92,8 +103,7 @@ class WishRepository(private val context: Context) {
     }
 
     /**
-     * 3. 【關鍵修復】根據 UUID 取得單一願望 (給 AppNavigation 快速上架用)
-     * 這就是您缺少的函式！
+     * 3. 根據 UUID 取得單一願望
      */
     suspend fun getWishByUuid(uuid: String): WishItem? {
         try {
@@ -115,9 +125,6 @@ class WishRepository(private val context: Context) {
             .await()
     }
 
-    /**
-     * 輔助：上傳圖片
-     */
     private suspend fun uploadImageToStorage(uri: Uri): String {
         val userId = getCurrentUserId() ?: return ""
         val filename = "wishes/$userId/${UUID.randomUUID()}.jpg"

@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,7 +28,7 @@ import com.example.c2cfastpay_card.R
 import com.example.c2cfastpay_card.UIScreen.components.BottomNavigationBar
 import com.example.c2cfastpay_card.UIScreen.components.ProductRepository
 import com.example.c2cfastpay_card.navigation.Screen
-import com.example.c2cfastpay_card.UIScreen.components.ProductItem // 確保有這個 import
+import com.example.c2cfastpay_card.UIScreen.components.ProductItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,11 +38,12 @@ fun SaleProductPage(
     val context = LocalContext.current
     val productRepository = remember { ProductRepository(context) }
 
-    // --- 【修正 1】改用 collectAsState 監聽 Firestore 資料流 ---
-    // 這樣當有人上架新商品時，畫面會自動更新
-    val productList by productRepository.getAllProducts()
+    var searchQuery by remember { mutableStateOf("") }
+
+    val productList by productRepository.getAllProducts(searchQuery = searchQuery)
         .collectAsState(initial = emptyList())
-    // -------------------------------------------------------
+
+    val primaryColor = Color(0xFF487F81)
 
     Scaffold(
         bottomBar = {
@@ -48,10 +53,10 @@ fun SaleProductPage(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(bottom = innerPadding.calculateBottomPadding())
                 .background(Color.White)
         ) {
-            // 背景圖
+            // --- 底層：背景圖 ---
             Image(
                 painter = painterResource(R.drawable.backgroud_of_selling_page),
                 contentDescription = null,
@@ -59,21 +64,10 @@ fun SaleProductPage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(240.dp)
+                    .align(Alignment.TopCenter)
             )
 
-            // 購物車按鈕
-            IconButton(
-                onClick = { navController.navigate(Screen.Cart.route) },
-                modifier = Modifier
-                    .size(35.dp)
-                    .align(Alignment.TopEnd)
-                    .padding(top = 56.dp, end = 16.dp)
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.cart_button),
-                    contentDescription = "Cart"
-                )
-            }
+            // --- 中層：頁面內容 ---
 
             // SALE 按鈕
             IconButton(
@@ -107,42 +101,58 @@ fun SaleProductPage(
                 )
             }
 
-            // 搜尋列 + 切換圖示
+            // 搜尋列
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 150.dp)
                     .fillMaxWidth(0.9f)
-                    .height(50.dp)
+                    .height(50.dp) // 稍微加高一點點以免文字被切，您可以根據需要微調回 45.dp
             ) {
-                Image(
-                    painter = painterResource(R.drawable.search_bar),
-                    contentDescription = null,
-                    contentScale = ContentScale.FillHeight,
+                OutlinedTextField(
+                    value = searchQuery,
+                    // 【修正 2】明確命名參數，解決 Unresolved reference: it
+                    onValueChange = { newText -> searchQuery = newText },
+                    label = {
+                        Text(
+                            "搜尋商品...",
+                            style = TextStyle(fontSize = 14.sp)
+                        )
+                    },
+                    textStyle = TextStyle(fontSize = 14.sp),
+                    singleLine = true,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "搜尋",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxHeight()
+                        .fillMaxHeight(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White.copy(alpha = 0.9f),
+                        unfocusedContainerColor = Color.White.copy(alpha = 0.9f),
+                        focusedBorderColor = primaryColor,
+                        unfocusedBorderColor = Color.LightGray,
+                    ),
+                    shape = RoundedCornerShape(24.dp)
+                    // 【修正 1】已移除 contentPadding 參數
                 )
-                IconButton(
-                    onClick = { /* TODO: 執行搜尋 */ },
-                    modifier = Modifier
-                        .size(32.dp)
-                        .offset(x = (-40).dp)
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.search_button),
-                        contentDescription = "Search"
-                    )
-                }
+
                 Spacer(Modifier.width(12.dp))
+
                 IconButton(
-                    onClick = { /* TODO: 切換視圖 */ },
+                    onClick = { /* 切換檢視 */ },
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.img_7),
-                        contentDescription = "Toggle View"
+                        contentDescription = "Toggle View",
+                        tint = primaryColor
                     )
                 }
             }
@@ -151,7 +161,7 @@ fun SaleProductPage(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 200.dp),
+                    .padding(top = 220.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 items(productList) { product ->
@@ -159,11 +169,12 @@ fun SaleProductPage(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
-                            // 【新增】點擊導航到詳情頁
                             .clickable {
                                 navController.navigate("product_detail/${product.id}")
                             },
                         shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFE0EBE8)),
+                        elevation = CardDefaults.cardElevation(4.dp)
                     ) {
                         Row(
                             modifier = Modifier
@@ -172,7 +183,6 @@ fun SaleProductPage(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (product.imageUri.isNotEmpty()) {
-                                // --- 【修正 2】直接載入 Storage 網址 ---
                                 Image(
                                     painter = rememberAsyncImagePainter(model = product.imageUri),
                                     contentDescription = "商品圖片",
@@ -203,6 +213,28 @@ fun SaleProductPage(
                     }
                 }
             }
+
+            // --- 頂層：透明標題列與購物車 (Layer On Top) ---
+            TopAppBar(
+                title = { }, // 留空，不顯示文字
+                navigationIcon = {},
+                actions = {
+                    // 確保 Screen.Cart 已經在您的 Screen.kt 中定義
+                    IconButton(onClick = { navController.navigate(Screen.Cart.route) }) {
+                        Icon(
+                            imageVector = Icons.Default.ShoppingCart,
+                            contentDescription = "購物車",
+                            tint = primaryColor
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                ),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+            )
         }
     }
 }
