@@ -123,4 +123,17 @@ class ProductRepository(private val context: Context) { // Context 雖然這裡�
         return snapshot.toObjects(ProductItem::class.java)
             .shuffled() // 隨機排序，增加配對趣味性
     }
+
+    suspend fun getProductById(productId: String): ProductItem? {
+        return try {
+            val document = db.collection("products")
+                .document(productId)
+                .get()
+                .await()
+            document.toObject(ProductItem::class.java)
+        } catch (e: Exception) {
+            Log.e("ProductRepository", "找不到商品: $productId", e)
+            null
+        }
+    }
 }

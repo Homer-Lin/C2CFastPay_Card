@@ -2,6 +2,7 @@ package com.example.c2cfastpay_card.UIScreen.Screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -62,7 +63,7 @@ fun SaleProductPage(
 
             // 購物車按鈕
             IconButton(
-                onClick = { /* TODO: 導航到購物車 */ },
+                onClick = { navController.navigate(Screen.Cart.route) },
                 modifier = Modifier
                     .size(35.dp)
                     .align(Alignment.TopEnd)
@@ -157,10 +158,12 @@ fun SaleProductPage(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 4.dp)
+                            // 【新增】點擊導航到詳情頁
+                            .clickable {
+                                navController.navigate("product_detail/${product.id}")
+                            },
                         shape = RoundedCornerShape(8.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFE0EBE8)),
-                        elevation = CardDefaults.cardElevation(4.dp)
                     ) {
                         Row(
                             modifier = Modifier

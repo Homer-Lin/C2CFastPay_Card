@@ -20,12 +20,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import com.example.c2cfastpay_card.UIScreen.Screens.CartScreen
 import com.example.c2cfastpay_card.UIScreen.components.WishRepository
 import com.google.gson.Gson
 
 import com.example.c2cfastpay_card.UIScreen.Screens.LoginScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.RegisterScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.ForgotPasswordScreen
+import com.example.c2cfastpay_card.UIScreen.Screens.ProductDetailScreen
+
 /**
  * 這是「導航圖」(NavHost)。
  * 它就像一個「總控制器」，根據 NavController 的指令，決定現在該顯示哪個畫面。
@@ -38,7 +41,9 @@ fun AppNavigationGraph(
     NavHost(
         navController = navController,
         startDestination = Screen.Login.route // 設定 App 啟動時的第一個畫面
+
     ) {
+
 
         composable(route = Screen.Login.route) {
             LoginScreen(
@@ -136,5 +141,21 @@ fun AppNavigationGraph(
         composable(route = Screen.AddWish.route) {
             AddWishScreen(navController = navController)
         }
+        composable(
+            route = Screen.ProductDetail.route,
+            arguments = listOf(androidx.navigation.navArgument("productId") {
+                type = androidx.navigation.NavType.StringType
+            })
+        ) { backStackEntry ->
+            val productId = backStackEntry.arguments?.getString("productId") ?: ""
+            ProductDetailScreen(
+                navController = navController,
+                productId = productId
+            )
+        }
+        composable(route = Screen.Cart.route) {
+            CartScreen(navController = navController)
+        }
+
     }
 }
