@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.c2cfastpay_card"
-        minSdk = 35
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -73,4 +73,15 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-storage")
+
+    // Retrofit
+    implementation ("com.squareup.retrofit2:retrofit:2.9.0")
+    // Gson 轉換器 (將 JSON 自動轉換成 Kotlin/Java 物件)
+    implementation ("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    // Kotlin Coroutines：用於非同步呼叫 (推薦)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
+
+
 }

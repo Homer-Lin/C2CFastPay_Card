@@ -1,7 +1,7 @@
 package com.example.c2cfastpay_card.UIScreen.Screens
 
 import android.net.Uri
-import android.util.Log // 【新增】Log Import
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,365 +10,356 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
-import com.example.c2cfastpay_card.R
-import com.example.c2cfastpay_card.UIScreen.components.WishItem
-import com.example.c2cfastpay_card.UIScreen.components.ProductItem
-import com.example.c2cfastpay_card.UIScreen.components.ProductRepository
-import com.example.c2cfastpay_card.navigation.Screen
 import com.google.gson.Gson
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import androidx.compose.material3.MaterialTheme
-import com.example.c2cfastpay_card.ui.theme.SaleColorScheme
-import com.example.c2cfastpay_card.utils.saveImageToInternalStorage
-import androidx.core.net.toUri // 【新增】toUri Import
+// 請記得 import 你的 DraftProduct
+// import com.example.c2cfastpay_card.model.DraftProduct
+
+// 暫時定義在這裡方便你複製，之後建議移到 model 檔案
+data class DraftProduct(
+    val imageUri: String = "",
+    val title: String = "",
+    val description: String = "",
+    val story: String = "",
+    val condition: String = "",
+    val fromAI: Boolean = false
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddProductScreen(navController: NavController, wishJson: String? = null) {
+fun AddProductScreen(navController: NavController, draftJson: String? = null) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val productRepository = remember { ProductRepository(context) }
-    val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
 
+    // --- 1. 狀態變數 (UI 資料) ---
+    // 圖片列表 (支援多張)
+    var photoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
-    // --- 【修改：還原為 LaunchedEffect 邏輯】 ---
+    // 文字欄位
+    var title by remember { mutableStateOf("") }
+    var content by remember { mutableStateOf("") } // 文案
+    var story by remember { mutableStateOf("") }   // 故事 (選填)
+    var price by remember { mutableStateOf("") }
+    var stock by remember { mutableStateOf("1") }
 
-    // 1. 將所有狀態的預設值都設為空字串或 null
-    var productName by remember { mutableStateOf("") }
-    var productDescription by remember { mutableStateOf("") } // 您的 WishItem 中沒有 description
-    var productSpecs by remember { mutableStateOf("") } // 您的 WishItem 中沒有 specs
-    var productPrice by remember { mutableStateOf("") }
-    var selectedTradeMethod by remember { mutableStateOf("") } // 預設空字串
-    var productNotes by remember { mutableStateOf("") } // 您的 WishItem 中沒有 notes
-    var productOtherInfo by remember { mutableStateOf("") } // 您的 WishItem 中沒有 other
-    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    // 新舊狀態 (下拉選單)
+    val statusOptions = listOf("全新", "二手")
+    var selectedStatus by remember { mutableStateOf(statusOptions[0]) }
+    var statusExpanded by remember { mutableStateOf(false) }
 
-    // 2. 使用 LaunchedEffect(wishJson)
-    //    這會在 wishJson 參數「改變」時 (例如從 null 變為 "{...json...}") 觸發
-    LaunchedEffect(wishJson) {
-        Log.d("DataFlowDebug", "步驟 6: AddProductScreen 收到 wishJson = $wishJson")
-        val actualWishJson = if (wishJson == "null" || wishJson.isNullOrEmpty()) {
-            null
-        } else {
-            wishJson
-        }
+    // 物流方式 (多選)
+    val logisticOptions = listOf("7-11", "全家", "面交")
+    var selectedLogistics by remember { mutableStateOf(setOf<String>()) }
 
-        if (actualWishJson != null) {
+    // --- 2. 接收外部資料 (AI 或 Step1) ---
+    LaunchedEffect(draftJson) {
+        if (!draftJson.isNullOrEmpty() && draftJson != "null") {
             try {
-                // 3. 解析 JSON
-                val wishItem = Gson().fromJson(actualWishJson, WishItem::class.java)
-                Log.d("DataFlowDebug", "步驟 7: 成功解析 JSON，準備設定狀態...")
-                // 4. 【強制更新】所有狀態
-                //    (我們只更新 WishItem 中有的欄位)
-                productName = wishItem.title
-                productPrice = wishItem.price
-                productDescription = wishItem.description
-                productSpecs = wishItem.specs
-                selectedTradeMethod = wishItem.payment
-                productNotes = wishItem.notes
-                productOtherInfo = wishItem.other
+                // 解碼 JSON (防止 URL 特殊字元問題)
+                val decodedJson = java.net.URLDecoder.decode(draftJson, "UTF-8")
+                val draft = Gson().fromJson(decodedJson, DraftProduct::class.java)
 
-                if (wishItem.imageUri.isNotEmpty()) {
-                    imageUri = wishItem.imageUri.toUri()
+                // 填入圖片
+                if (draft.imageUri.isNotEmpty()) {
+                    val uri = draft.imageUri.toUri()
+                    if (!photoUris.contains(uri)) {
+                        photoUris = photoUris + uri
+                    }
                 }
 
-                // (註：您的 WishItem 中沒有 description, specs, notes, other，
-                //    所以它們會保持為空字串，這也是您在 AddProductScreen.kt 中
-                //    的原始邏輯)
-
+                // 填入文字資料 (如果是 AI 來的)
+                if (draft.fromAI) {
+                    title = draft.title
+                    content = draft.description
+                    story = draft.story
+                    if (draft.condition in statusOptions) {
+                        selectedStatus = draft.condition
+                    }
+                }
             } catch (e: Exception) {
-                Log.e("AddProductScreen", "Failed to parse wishJson: $wishJson", e)
-                Log.e("DataFlowDebug", "步驟 7 失敗: 解析 JSON 錯誤", e)
+                Log.e("AddProductScreen", "解析失敗", e)
             }
-        } else {
-            // 【重要】如果 wishJson 變回 null (例如用戶點了返回又點了上架)
-            // 我們需要重置表單，否則會顯示上一個「快速上架」的資料
-            Log.d("DataFlowDebug", "步驟 7 失敗: wishJson 為 null，重置表單")
-            productName = ""
-            productPrice = ""
-            selectedTradeMethod = ""
-            imageUri = null
-            productDescription = ""
-            productSpecs = ""
-            productNotes = ""
-            productOtherInfo = ""
         }
     }
-    // --- 【修改結束】 ---
 
-    val imagePickerLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-            imageUri = uri
-        }
-    val tradeMethods = listOf("面交", "宅配", "超商取貨")
-    var expanded by remember { mutableStateOf(false) }
+    // 圖片選擇器
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        photoUris = photoUris + uris
+    }
 
-    MaterialTheme(colorScheme = SaleColorScheme) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = "上架商品",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 20.sp
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { navController.navigate(Screen.Sale.route) }) {
-                            Image(
-                                painter = painterResource(id = R.drawable.a_1_back_buttom),
-                                contentDescription = "返回"
-                            )
-                        }
-                    },
-                    actions = {
-                        Button(onClick = { navController.navigate(Screen.AddWish.route) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800))) {
-                            Text("我要許願" ,
-                                color = Color.White,
-                                fontSize = 18.sp)
-                        }
-                    },
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text("上架商品", style = MaterialTheme.typography.titleLarge) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = Color.White
                 )
-            }
-        ) { innerPadding ->
-            // --- 可滾動的表單內容 ---
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 16.dp)
-                    .background(MaterialTheme.colorScheme.background)
-                    .verticalScroll(scrollState)
-            ) {
-                Spacer(modifier = Modifier.height(24.dp))
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(Color(0xFFF9F9F9)) // 微微灰背景，讓卡片更明顯
+                .verticalScroll(scrollState)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
 
-                // --- 圖片選擇區域 ---
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable { imagePickerLauncher.launch("image/*") },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (imageUri != null) {
+            // --- 圖片區塊 (Horizontal Scroll) ---
+            Text("商品圖片", modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.Gray)
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 顯示已選圖片
+                items(photoUris) { uri ->
+                    Box(modifier = Modifier.size(110.dp)) {
                         Image(
-                            painter = rememberAsyncImagePainter(imageUri),
-                            contentDescription = "商品圖片",
-                            modifier = Modifier.fillMaxSize(),
+                            painter = rememberAsyncImagePainter(uri),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp)),
                             contentScale = ContentScale.Crop
                         )
-                    } else {
+                        // 刪除按鈕
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Remove",
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .size(20.dp)
+                                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                .clickable { photoUris = photoUris - uri },
+                            tint = Color.White
+                        )
+                    }
+                }
+                // 新增圖片按鈕
+                item {
+                    Box(
+                        modifier = Modifier
+                            .size(110.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White)
+                            .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
+                            .clickable { galleryLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.AddPhotoAlternate,
-                                contentDescription = "選擇圖片",
-                                modifier = Modifier.size(50.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "點擊上傳圖片",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                            )
+                            Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = Color.Gray)
+                            Text("新增照片", fontSize = 12.sp, color = Color.Gray)
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // --- 輸入欄位 (使用 OutlinedTextField) ---
-
-                // 商品名稱 (帶*號)
-                OutlinedTextField(
-                    value = productName,
-                    onValueChange = { productName = it },
-                    label = { Text("上架商品名稱*") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    singleLine = true
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 商品描述
-                OutlinedTextField(
-                    value = productDescription,
-                    onValueChange = { productDescription = it },
-                    label = { Text("商品描述") },
-                    modifier = Modifier.fillMaxWidth().height(120.dp),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 商品規格
-                OutlinedTextField(
-                    value = productSpecs,
-                    onValueChange = { productSpecs = it },
-                    label = { Text("商品規格") },
-                    modifier = Modifier.fillMaxWidth().height(120.dp),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 商品價格 (帶*號)
-                OutlinedTextField(
-                    value = productPrice,
-                    onValueChange = { productPrice = it },
-                    label = { Text("商品價格*") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number,
-                        imeAction = ImeAction.Next
-                    ),
-                    singleLine = true,
-                    leadingIcon = { Text("NT$") }
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 交易方式下拉選單
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded }
-                ) {
-                    OutlinedTextField(
-                        value = selectedTradeMethod.ifEmpty { "請選擇交易方式*" },
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("交易方式*") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
-                            .clickable { expanded = !expanded }
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }) {
-                        tradeMethods.forEach { method ->
-                            DropdownMenuItem(text = { Text(method) }, onClick = {
-                                selectedTradeMethod = method
-                                expanded = false
-                            })
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 注意事項
-                OutlinedTextField(
-                    value = productNotes,
-                    onValueChange = { productNotes = it },
-                    label = { Text("注意事項") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 其他資訊
-                OutlinedTextField(
-                    value = productOtherInfo,
-                    onValueChange = { productOtherInfo = it },
-                    label = { Text("其他資訊") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // --- 上架按鈕 ---
-                Button(
-                    onClick = {
-                        // (上架邏輯保持不變)
-                        if (productName.isBlank() || productPrice.isBlank() || selectedTradeMethod.isBlank()) {
-                            Toast.makeText(context, "請填寫所有必填欄位 (*)", Toast.LENGTH_SHORT)
-                                .show()
-                            return@Button
-                        }
-                        if (productPrice.toDoubleOrNull() == null) {
-                            Toast.makeText(context, "價格必須是數字", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        scope.launch(Dispatchers.IO) {
-                            try {
-                                val finalImageUriString = imageUri?.let { uri ->
-                                    saveImageToInternalStorage(context, uri)
-                                } ?: ""
-
-                                val newProduct = ProductItem(
-                                    title = productName,
-                                    description = productDescription,
-                                    specs = productSpecs,
-                                    price = productPrice,
-                                    payment = selectedTradeMethod,
-                                    notes = productNotes,
-                                    other = productOtherInfo,
-                                    imageUri = finalImageUriString
-                                )
-
-                                productRepository.addProduct(newProduct)
-
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(context, "商品已成功上架", Toast.LENGTH_SHORT)
-                                        .show()
-                                    navController.navigate(Screen.Sale.route) {
-                                        popUpTo(Screen.Sale.route) { inclusive = true }
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(
-                                        context,
-                                        "上架失敗：${e.message}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
-                    )
-                ) {
-                    Text(
-                        "上架商品", fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onSecondary
-                    )
-
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // --- 輸入欄位區 ---
+
+            // 標題
+            MyTextField(value = title, onValueChange = { title = it }, label = "商品標題")
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 文案
+            MyTextField(
+                value = content,
+                onValueChange = { content = it },
+                label = "商品文案",
+                singleLine = false,
+                modifier = Modifier.height(120.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 故事 (選填)
+            MyTextField(
+                value = story,
+                onValueChange = { story = it },
+                label = "商品故事 (選填)",
+                singleLine = false,
+                modifier = Modifier.height(100.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 價格與庫存 (並排)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MyTextField(
+                    value = price,
+                    onValueChange = { if (it.all { c -> c.isDigit() }) price = it },
+                    label = "價格",
+                    keyboardType = KeyboardType.Number,
+                    modifier = Modifier.weight(1f)
+                )
+                MyTextField(
+                    value = stock,
+                    onValueChange = { if (it.all { c -> c.isDigit() }) stock = it },
+                    label = "庫存",
+                    keyboardType = KeyboardType.Number,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- 新舊狀態 (下拉選單) ---
+            ExposedDropdownMenuBox(
+                expanded = statusExpanded,
+                onExpandedChange = { statusExpanded = !statusExpanded },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = selectedStatus,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("新舊狀態") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = statusExpanded) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White
+                    )
+                )
+                ExposedDropdownMenu(
+                    expanded = statusExpanded,
+                    onDismissRequest = { statusExpanded = false }
+                ) {
+                    statusOptions.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option) },
+                            onClick = {
+                                selectedStatus = option
+                                statusExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- 物流方式 (多選 Chips) ---
+            Text("物流方式 (可多選)", modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.Gray)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                logisticOptions.forEach { option ->
+                    val isSelected = selectedLogistics.contains(option)
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = {
+                            val current = selectedLogistics.toMutableSet()
+                            if (isSelected) current.remove(option) else current.add(option)
+                            selectedLogistics = current
+                        },
+                        label = { Text(option) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFF759E9F), // 你的主題色
+                            selectedLabelColor = Color.White
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,           // 1. 補上 enabled
+                            selected = isSelected,    // 2. 補上 selected
+                            borderColor = if(isSelected) Color.Transparent else Color.Gray
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // --- 確認按鈕 ---
+            Button(
+                onClick = {
+                    // 驗證
+                    if (title.isBlank() || content.isBlank() || price.isBlank() || selectedLogistics.isEmpty()) {
+                        Toast.makeText(context, "請填寫完整資訊 (標題、文案、價格、物流)", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+
+                    // TODO: 這裡之後接資料庫，現在先顯示成功
+                    // 未來可以把 photoUris 轉字串, selectedLogistics 轉字串存入 DB
+                    Toast.makeText(context, "商品上架成功 (UI測試)", Toast.LENGTH_SHORT).show()
+                    navController.popBackStack()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF759E9F))
+            ) {
+                Text("確認上架", fontSize = 18.sp, color = Color.White)
+            }
+
+            Spacer(modifier = Modifier.height(50.dp))
         }
     }
+}
+
+// 封裝一個通用的 TextField 讓 UI 程式碼更乾淨
+@Composable
+fun MyTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    singleLine: Boolean = true,
+    keyboardType: KeyboardType = KeyboardType.Text
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, color = Color.Gray) },
+        modifier = modifier,
+        singleLine = singleLine,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = Color.White,
+            unfocusedContainerColor = Color.White,
+            focusedBorderColor = Color(0xFF759E9F),
+            unfocusedBorderColor = Color.LightGray
+        )
+    )
 }

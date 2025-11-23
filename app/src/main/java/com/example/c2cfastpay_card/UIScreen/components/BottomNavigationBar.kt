@@ -15,7 +15,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.c2cfastpay_card.R
-import com.example.c2cfastpay_card.navigation.Screen // 匯入您的路由
+import com.example.c2cfastpay_card.navigation.Screen
 
 @Composable
 fun BottomNavigationBar(navController: NavController) {
@@ -23,59 +23,68 @@ fun BottomNavigationBar(navController: NavController) {
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .background(Color.White), // 您可以自訂背景色
+            .background(Color.White),
         horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically // 確保圖示垂直置中
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Home 按鈕 (導航到 Sale 畫面)
+        // Home 按鈕
         IconButton(onClick = { navController.navigate(Screen.Sale.route) {
-            // 可選：避免在返回堆疊中累積大量相同的畫面
             popUpTo(navController.graph.startDestinationId) { saveState = true }
             launchSingleTop = true
             restoreState = true
         }}) {
             Icon(
-                painter = painterResource(R.drawable.img_2), // Home 圖示
+                painter = painterResource(R.drawable.img_2),
                 contentDescription = "Home"
             )
         }
 
-        // Add 按鈕
-        IconButton(onClick = {navController.navigate(Screen.AddProduct.route){
-            popUpTo(navController.graph.startDestinationId) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }}) {
+        // ==========================================
+        // 【修改重點】Add 按鈕 -> 改去 Screen.AddStep1
+        // ==========================================
+        IconButton(onClick = {
+            // 這裡改成 AddStep1.route，才會先去拍照頁面
+            navController.navigate(Screen.AddStep1.route) {
+                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }) {
             Icon(
-                painter = painterResource(R.drawable.img_3), // Add 圖示
+                painter = painterResource(R.drawable.img_3),
                 contentDescription = "Add"
             )
         }
 
-        // Connect 按鈕 (導航到 CardStack 畫面)
+        // Connect 按鈕
         IconButton(onClick = { navController.navigate(Screen.CardStack.route){
             popUpTo(navController.graph.startDestinationId) { saveState = true }
             launchSingleTop = true
             restoreState = true
         }}) {
             Icon(
-                painter = painterResource(R.drawable.img_4), // Connect 圖示
+                painter = painterResource(R.drawable.img_4),
                 contentDescription = "Connect"
             )
         }
 
         // Chat 按鈕
-        IconButton(onClick = { /* TODO: 導航到 Chat */ }) {
+        IconButton(onClick = {
+            // 如果您的 Screen.kt 有定義 Chat，可以把 TODO 改掉
+            // navController.navigate(Screen.Chat.route)
+        }) {
             Icon(
-                painter = painterResource(R.drawable.img_5), // Chat 圖示
+                painter = painterResource(R.drawable.img_5),
                 contentDescription = "Chat"
             )
         }
 
         // User 按鈕
-        IconButton(onClick = { /* TODO: 導航到 User */ }) {
+        IconButton(onClick = {
+            // navController.navigate(Screen.User.route)
+        }) {
             Icon(
-                painter = painterResource(R.drawable.img_6), // User 圖示
+                painter = painterResource(R.drawable.img_6),
                 contentDescription = "User"
             )
         }
