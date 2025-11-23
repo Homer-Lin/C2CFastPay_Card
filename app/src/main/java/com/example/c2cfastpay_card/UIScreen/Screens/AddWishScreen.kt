@@ -6,310 +6,345 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
-import com.example.c2cfastpay_card.UIScreen.components.WishRepository
 import com.example.c2cfastpay_card.navigation.Screen
-// 1. 確保有導入 WishItem 和 UUID
-import com.example.c2cfastpay_card.UIScreen.components.WishItem
-import java.util.UUID
-// 如果 WishColorScheme 報錯，請改回 C2CFastPay_CardTheme 或確認 Theme.kt 有定義
-import com.example.c2cfastpay_card.ui.theme.WishColorScheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import com.example.c2cfastpay_card.utils.saveImageToInternalStorage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddWishScreen(navController: NavController) {
-
     val context = LocalContext.current
-    val wishRepository = remember { WishRepository(context) }
-    val scope = rememberCoroutineScope()
-    val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
 
-    // --- 狀態管理 ---
-    var wishTitle by remember { mutableStateOf("") }
-    var wishDescription by remember { mutableStateOf("") }
-    var wishSpecs by remember { mutableStateOf("") }
-    var wishPrice by remember { mutableStateOf("") }
-    var wishNotes by remember { mutableStateOf("") }
-    var wishOtherInfo by remember { mutableStateOf("") }
-    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    // --- 定義顏色 ---
+    val mainOrangeColor = Color(0xFFFF9800) // 主題橘色
+    val buttonGreenColor = Color(0xFF487F81) // 右上角按鈕用的綠色
 
-    val imagePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        imageUri = uri
+    // --- 1. 狀態變數 ---
+    var photoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+
+    // 欄位變數
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") } // 願望描述
+    var price by remember { mutableStateOf("") }       // 願付價格
+    var quantity by remember { mutableStateOf("1") }   // 欲購數量
+    var note by remember { mutableStateOf("") }        // 備註 (新增的)
+
+    // 新舊狀態 (新增"皆可")
+    val statusOptions = listOf("全新", "二手", "皆可")
+    var selectedStatus by remember { mutableStateOf(statusOptions[0]) }
+    var statusExpanded by remember { mutableStateOf(false) }
+
+    // 物流方式
+    val logisticOptions = listOf("7-11", "全家", "面交")
+    var selectedLogistics by remember { mutableStateOf(setOf<String>()) }
+
+    // 圖片選擇器
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        photoUris = photoUris + uris
     }
-    val tradeMethods = listOf("面交", "宅配", "超商取貨")
-    var expanded by remember { mutableStateOf(false) }
-    var selectedTradeMethod by remember { mutableStateOf("") }
-    // --- 狀態管理結束 ---
 
-    MaterialTheme(colorScheme = WishColorScheme) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = "新增許願",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 20.sp
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = {navController.navigate(Screen.Sale.route) }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "返回"
-                            )
-                        }
-                    },
-                    actions = {
-                        // 這裡的導航建議使用 Screen.AddProduct.route
-                        Button(
-                            onClick = { navController.navigate(Screen.AddProduct.route) },
-                            colors = ButtonDefaults.buttonColors(Color(0xFF487F81))
-                        ) {
-                            Text(
-                                "我要上架",
-                                color = Color.White,
-                                fontSize = 18.sp
-                            )
-                        }
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text("新增願望", style = MaterialTheme.typography.titleLarge) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
-                )
-            }
-        ) { innerPadding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 16.dp)
-                    .background(MaterialTheme.colorScheme.background)
-                    .verticalScroll(scrollState)
-            ) {
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // --- 圖片選擇區域 ---
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant,
-                            RoundedCornerShape(8.dp)
+                },
+                // ★★★ 右上角按鈕：樣式依照要求 (綠色框/底)，文字改為"我要上架"以便切換 ★★★
+                actions = {
+                    Button(
+                        onClick = {
+                            // 這裡導航去 "上架第一步" (AddStep1)
+                            navController.navigate(Screen.AddStep1.route)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = buttonGreenColor // 指定的綠色 0xFF487F81
+                        ),
+                        shape = RoundedCornerShape(50),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .height(36.dp)
+                    ) {
+                        Text(
+                            text = "我要上架", // 切換回上架模式
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                        .clickable { imagePickerLauncher.launch("image/*") },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (imageUri != null) {
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = Color.White
+                )
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(Color(0xFFFFF8E1)) // 背景改為非常淡的橘黃色，或是保持 F9F9F9 也可以
+                .verticalScroll(scrollState)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            // --- 圖片區塊 (參考圖片) ---
+            Text("參考圖片 (選填)", modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.Gray)
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items(photoUris) { uri ->
+                    Box(modifier = Modifier.size(110.dp)) {
                         Image(
-                            painter = rememberAsyncImagePainter(imageUri),
-                            contentDescription = "許願圖片",
-                            modifier = Modifier.fillMaxSize(),
+                            painter = rememberAsyncImagePainter(uri),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp)),
                             contentScale = ContentScale.Crop
                         )
-                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Remove",
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .size(20.dp)
+                                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                .clickable { photoUris = photoUris - uri },
+                            tint = Color.White
+                        )
+                    }
+                }
+                item {
+                    Box(
+                        modifier = Modifier
+                            .size(110.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White)
+                            .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
+                            .clickable { galleryLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.AddPhotoAlternate,
-                                contentDescription = "選擇圖片",
-                                modifier = Modifier.size(50.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "點擊上傳圖片",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                            )
+                            Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = Color.Gray)
+                            Text("新增照片", fontSize = 12.sp, color = Color.Gray)
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // --- 輸入欄位 ---
-                OutlinedTextField(
-                    value = wishTitle,
-                    onValueChange = { wishTitle = it },
-                    label = { Text("許願商品名稱*") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    singleLine = true
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = wishDescription,
-                    onValueChange = { wishDescription = it },
-                    label = { Text("許願商品描述") },
-                    modifier = Modifier.fillMaxWidth().height(120.dp),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = wishSpecs,
-                    onValueChange = { wishSpecs = it },
-                    label = { Text("許願商品規格") },
-                    modifier = Modifier.fillMaxWidth().height(120.dp),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = wishPrice,
-                    onValueChange = { wishPrice = it },
-                    label = { Text("期望價格*") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number,
-                        imeAction = ImeAction.Next
-                    ),
-                    singleLine = true,
-                    leadingIcon = { Text("NT$") }
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 交易方式
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded }
-                ) {
-                    OutlinedTextField(
-                        value = selectedTradeMethod.ifEmpty { "請選擇交易方式*" },
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("交易方式*") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
-                            .clickable { expanded = !expanded }
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }) {
-                        tradeMethods.forEach { method ->
-                            DropdownMenuItem(text = { Text(method) }, onClick = {
-                                selectedTradeMethod = method
-                                expanded = false
-                            })
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = wishNotes,
-                    onValueChange = { wishNotes = it },
-                    label = { Text("注意事項") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = wishOtherInfo,
-                    onValueChange = { wishOtherInfo = it },
-                    label = { Text("其他") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // --- 新增許願按鈕 (關鍵修改部分) ---
-                Button(
-                    onClick = {
-                        scope.launch(Dispatchers.IO) {
-                            val isValid = wishTitle.isNotBlank() &&
-                                    wishPrice.isNotBlank() &&
-                                    wishPrice.toDoubleOrNull() != null &&
-                                    selectedTradeMethod.isNotBlank()
-
-                            if (!isValid) {
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(context, "請填寫所有必填 (*) 欄位並確認價格格式正確", Toast.LENGTH_SHORT).show()
-                                }
-                                return@launch
-                            }
-
-                            try {
-                                // 1. 儲存圖片到內部空間 (可選，為了取得路徑)
-                                // 如果您希望上傳到 Firebase Storage，WishRepository.addWish 已經有處理
-                                // 這裡我們只需要取得 URI 字串傳給它
-                                val finalImageUriString = imageUri?.let { uri ->
-                                    saveImageToInternalStorage(context, uri)
-                                } ?: ""
-
-                                // 2. 【修正】建立 WishItem 物件
-                                // 包含所有新欄位，並手動生成 UUID 防止 null 錯誤
-                                val newWish = WishItem(
-                                    title = wishTitle,
-                                    description = wishDescription, // 新增欄位
-                                    specs = wishSpecs,             // 新增欄位
-                                    price = wishPrice,
-                                    payment = selectedTradeMethod,
-                                    notes = wishNotes,             // 新增欄位
-                                    other = wishOtherInfo,         // 新增欄位
-                                    imageUri = finalImageUriString,
-                                    uuid = UUID.randomUUID().toString() // 【關鍵】生成 UUID
-                                )
-
-                                // 3. 【修正】呼叫新版 addWish
-                                wishRepository.addWish(newWish)
-
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(context, "願望已成功新增", Toast.LENGTH_SHORT).show()
-                                    navController.navigate(Screen.WishList.route) {
-                                        popUpTo(navController.graph.startDestinationId) { inclusive = false }
-                                        launchSingleTop = true
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(context, "儲存失敗：${e.message}", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
-                    Text(
-                        "新增許願", fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onSecondary
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // --- 輸入欄位區 (使用橘色主題 TextField) ---
+
+            // 標題
+            WishTextField(value = title, onValueChange = { title = it }, label = "願望標題", themeColor = mainOrangeColor)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 願望描述
+            WishTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = "願望描述 (例如：希望是哪一年的款式...)",
+                singleLine = false,
+                modifier = Modifier.height(120.dp),
+                themeColor = mainOrangeColor
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 願付價格 與 欲購數量
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                WishTextField(
+                    value = price,
+                    onValueChange = { if (it.all { c -> c.isDigit() }) price = it },
+                    label = "願付價格",
+                    keyboardType = KeyboardType.Number,
+                    modifier = Modifier.weight(1f),
+                    themeColor = mainOrangeColor
+                )
+                WishTextField(
+                    value = quantity,
+                    onValueChange = { if (it.all { c -> c.isDigit() }) quantity = it },
+                    label = "欲購數量",
+                    keyboardType = KeyboardType.Number,
+                    modifier = Modifier.weight(1f),
+                    themeColor = mainOrangeColor
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- 新舊狀態 (下拉選單) ---
+            ExposedDropdownMenuBox(
+                expanded = statusExpanded,
+                onExpandedChange = { statusExpanded = !statusExpanded },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = selectedStatus,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("接受狀態") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = statusExpanded) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        // ★ 設定聚焦顏色為橘色
+                        focusedBorderColor = mainOrangeColor,
+                        focusedLabelColor = mainOrangeColor
+                    )
+                )
+                ExposedDropdownMenu(
+                    expanded = statusExpanded,
+                    onDismissRequest = { statusExpanded = false }
+                ) {
+                    statusOptions.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option) },
+                            onClick = {
+                                selectedStatus = option
+                                statusExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- 備註 (新增欄位) ---
+            WishTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = "備註",
+                singleLine = false,
+                modifier = Modifier.height(80.dp),
+                themeColor = mainOrangeColor
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- 物流方式 (橘色 Chips) ---
+            Text("希望物流方式", modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.Gray)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                logisticOptions.forEach { option ->
+                    val isSelected = selectedLogistics.contains(option)
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = {
+                            val current = selectedLogistics.toMutableSet()
+                            if (isSelected) current.remove(option) else current.add(option)
+                            selectedLogistics = current
+                        },
+                        label = { Text(option) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = mainOrangeColor, // ★ 選中變成橘色
+                            selectedLabelColor = Color.White
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if(isSelected) Color.Transparent else Color.Gray
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // --- 確認按鈕 (橘色) ---
+            Button(
+                onClick = {
+                    if (title.isBlank() || description.isBlank() || price.isBlank() || selectedLogistics.isEmpty()) {
+                        Toast.makeText(context, "請填寫完整資訊", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    Toast.makeText(context, "願望已送出", Toast.LENGTH_SHORT).show()
+                    navController.popBackStack()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = mainOrangeColor) // ★ 按鈕橘色
+            ) {
+                Text("確認許願", fontSize = 18.sp, color = Color.White)
+            }
+
+            Spacer(modifier = Modifier.height(50.dp))
         }
     }
+}
+
+// 專屬的橘色系 TextField
+@Composable
+fun WishTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    singleLine: Boolean = true,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    themeColor: Color
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, color = Color.Gray) },
+        modifier = modifier,
+        singleLine = singleLine,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = Color.White,
+            unfocusedContainerColor = Color.White,
+            focusedBorderColor = themeColor, // 傳入橘色
+            unfocusedBorderColor = Color.LightGray,
+            focusedLabelColor = themeColor   // Label 也變橘色
+        )
+    )
 }

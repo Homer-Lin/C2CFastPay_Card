@@ -36,6 +36,7 @@ import com.example.c2cfastpay_card.UIScreen.Screens.SaleProductPage
 import com.example.c2cfastpay_card.UIScreen.Screens.WishPreviewPage
 import com.example.c2cfastpay_card.UIScreen.components.WishRepository
 import com.google.gson.Gson
+import com.example.c2cfastpay_card.UIScreen.Screens.WishOrProductScreen
 
 /**
  * 這是「導航圖」(NavHost)。
@@ -97,6 +98,10 @@ fun AppNavigationGraph(
         // 4. 許願池
         composable(route = Screen.WishList.route) {
             WishPreviewPage(navController = navController)
+        }
+
+        composable(route = Screen.WishOrProduct.route) {
+            WishOrProductScreen(navController = navController)
         }
 
         // ==========================================

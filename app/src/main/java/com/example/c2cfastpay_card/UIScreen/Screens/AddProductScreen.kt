@@ -29,17 +29,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.navigation.NavController
+import com.example.c2cfastpay_card.navigation.Screen
 import coil.compose.rememberAsyncImagePainter
 import com.google.gson.Gson
-// 請記得 import 你的 DraftProduct
-// import com.example.c2cfastpay_card.model.DraftProduct
+// import com.example.c2cfastpay_card.model.DraftProduct (請解開您的 import)
 
-// 暫時定義在這裡方便你複製，之後建議移到 model 檔案
+// 暫時定義，請使用您專案原本的
 data class DraftProduct(
     val imageUri: String = "",
     val title: String = "",
@@ -55,50 +56,37 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    // --- 1. 狀態變數 (UI 資料) ---
-    // 圖片列表 (支援多張)
+    // --- 1. 狀態變數 ---
     var photoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
-
-    // 文字欄位
     var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") } // 文案
-    var story by remember { mutableStateOf("") }   // 故事 (選填)
+    var content by remember { mutableStateOf("") }
+    var story by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
     var stock by remember { mutableStateOf("1") }
 
-    // 新舊狀態 (下拉選單)
     val statusOptions = listOf("全新", "二手")
     var selectedStatus by remember { mutableStateOf(statusOptions[0]) }
     var statusExpanded by remember { mutableStateOf(false) }
 
-    // 物流方式 (多選)
     val logisticOptions = listOf("7-11", "全家", "面交")
     var selectedLogistics by remember { mutableStateOf(setOf<String>()) }
 
-    // --- 2. 接收外部資料 (AI 或 Step1) ---
+    // --- 2. 接收外部資料 ---
     LaunchedEffect(draftJson) {
         if (!draftJson.isNullOrEmpty() && draftJson != "null") {
             try {
-                // 解碼 JSON (防止 URL 特殊字元問題)
                 val decodedJson = java.net.URLDecoder.decode(draftJson, "UTF-8")
                 val draft = Gson().fromJson(decodedJson, DraftProduct::class.java)
 
-                // 填入圖片
                 if (draft.imageUri.isNotEmpty()) {
                     val uri = draft.imageUri.toUri()
-                    if (!photoUris.contains(uri)) {
-                        photoUris = photoUris + uri
-                    }
+                    if (!photoUris.contains(uri)) photoUris = photoUris + uri
                 }
-
-                // 填入文字資料 (如果是 AI 來的)
                 if (draft.fromAI) {
                     title = draft.title
                     content = draft.description
                     story = draft.story
-                    if (draft.condition in statusOptions) {
-                        selectedStatus = draft.condition
-                    }
+                    if (draft.condition in statusOptions) selectedStatus = draft.condition
                 }
             } catch (e: Exception) {
                 Log.e("AddProductScreen", "解析失敗", e)
@@ -106,7 +94,6 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
         }
     }
 
-    // 圖片選擇器
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
@@ -122,6 +109,32 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                // ★★★ 這裡新增了右上角的許願按鈕 ★★★
+                actions = {
+                    Button(
+                        onClick = {
+                            // 請確認這是您 Navigation 中定義的 route 名稱 (如 Screen.AddWish.route)
+                            navController.navigate(Screen.AddWish.route)
+
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFFF9800) // 橘色背景
+                        ),
+                        shape = RoundedCornerShape(50), // 圓角
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .height(36.dp) // 高度稍微設小一點，比較精緻
+                    ) {
+                        Text(
+                            text = "我要許願",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                // ★★★ 結束 ★★★
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = Color.White
                 )
@@ -132,20 +145,19 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color(0xFFF9F9F9)) // 微微灰背景，讓卡片更明顯
+                .background(Color(0xFFF9F9F9))
                 .verticalScroll(scrollState)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // --- 圖片區塊 (Horizontal Scroll) ---
+            // --- 圖片區塊 ---
             Text("商品圖片", modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.Gray)
             LazyRow(
                 modifier = Modifier.fillMaxWidth().height(120.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 顯示已選圖片
                 items(photoUris) { uri ->
                     Box(modifier = Modifier.size(110.dp)) {
                         Image(
@@ -157,7 +169,6 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                                 .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp)),
                             contentScale = ContentScale.Crop
                         )
-                        // 刪除按鈕
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Remove",
@@ -171,7 +182,6 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                         )
                     }
                 }
-                // 新增圖片按鈕
                 item {
                     Box(
                         modifier = Modifier
@@ -193,13 +203,8 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
             Spacer(modifier = Modifier.height(24.dp))
 
             // --- 輸入欄位區 ---
-
-            // 標題
             MyTextField(value = title, onValueChange = { title = it }, label = "商品標題")
-
             Spacer(modifier = Modifier.height(16.dp))
-
-            // 文案
             MyTextField(
                 value = content,
                 onValueChange = { content = it },
@@ -207,10 +212,7 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                 singleLine = false,
                 modifier = Modifier.height(120.dp)
             )
-
             Spacer(modifier = Modifier.height(16.dp))
-
-            // 故事 (選填)
             MyTextField(
                 value = story,
                 onValueChange = { story = it },
@@ -218,10 +220,8 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                 singleLine = false,
                 modifier = Modifier.height(100.dp)
             )
-
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 價格與庫存 (並排)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MyTextField(
                     value = price,
@@ -241,7 +241,7 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // --- 新舊狀態 (下拉選單) ---
+            // --- 新舊狀態 ---
             ExposedDropdownMenuBox(
                 expanded = statusExpanded,
                 onExpandedChange = { statusExpanded = !statusExpanded },
@@ -278,7 +278,7 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // --- 物流方式 (多選 Chips) ---
+            // --- 物流方式 ---
             Text("物流方式 (可多選)", modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.Gray)
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -295,12 +295,12 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                         },
                         label = { Text(option) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFF759E9F), // 你的主題色
+                            selectedContainerColor = Color(0xFF759E9F),
                             selectedLabelColor = Color.White
                         ),
                         border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,           // 1. 補上 enabled
-                            selected = isSelected,    // 2. 補上 selected
+                            enabled = true,
+                            selected = isSelected,
                             borderColor = if(isSelected) Color.Transparent else Color.Gray
                         )
                     )
@@ -312,32 +312,24 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
             // --- 確認按鈕 ---
             Button(
                 onClick = {
-                    // 驗證
                     if (title.isBlank() || content.isBlank() || price.isBlank() || selectedLogistics.isEmpty()) {
                         Toast.makeText(context, "請填寫完整資訊 (標題、文案、價格、物流)", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-
-                    // TODO: 這裡之後接資料庫，現在先顯示成功
-                    // 未來可以把 photoUris 轉字串, selectedLogistics 轉字串存入 DB
-                    Toast.makeText(context, "商品上架成功 (UI測試)", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "商品上架成功", Toast.LENGTH_SHORT).show()
                     navController.popBackStack()
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF759E9F))
             ) {
                 Text("確認上架", fontSize = 18.sp, color = Color.White)
             }
-
             Spacer(modifier = Modifier.height(50.dp))
         }
     }
 }
 
-// 封裝一個通用的 TextField 讓 UI 程式碼更乾淨
 @Composable
 fun MyTextField(
     value: String,

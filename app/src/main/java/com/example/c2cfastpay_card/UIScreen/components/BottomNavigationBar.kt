@@ -40,11 +40,11 @@ fun BottomNavigationBar(navController: NavController) {
         }
 
         // ==========================================
-        // 【修改重點】Add 按鈕 -> 改去 Screen.AddStep1
         // ==========================================
         IconButton(onClick = {
-            // 這裡改成 AddStep1.route，才會先去拍照頁面
-            navController.navigate(Screen.AddStep1.route) {
+            // ★ 修改這裡：連到選擇頁面
+            navController.navigate(Screen.WishOrProduct.route) {
+                // 這裡的 popUpTo 設定看你的需求，通常保持原本的即可
                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
