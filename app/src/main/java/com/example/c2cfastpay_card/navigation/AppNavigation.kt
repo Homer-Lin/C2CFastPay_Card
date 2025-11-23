@@ -67,14 +67,21 @@ fun AppNavigationGraph(
         composable(route = Screen.Register.route) {
             RegisterScreen(
                 navController = navController,
-                onSwitchToLogin = { navController.popBackStack() }
+                onSwitchToLogin = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Register.route) { inclusive = true }
+                    }
+                }
             )
         }
 
         composable(route = Screen.ForgotPassword.route) {
             ForgotPasswordScreen(
                 navController = navController,
-                onConfirmSuccess = { navController.popBackStack() }
+                onConfirmSuccess = { navController.popBackStack() },
+                onSwitchToLogin = {
+                    navController.popBackStack() // 返回上一頁 (即登入頁)
+                }
             )
         }
 
