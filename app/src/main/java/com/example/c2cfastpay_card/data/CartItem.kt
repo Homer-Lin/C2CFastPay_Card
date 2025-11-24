@@ -6,18 +6,26 @@ import java.util.UUID
  * 購物車項目資料模型
  */
 data class CartItem(
-    val id: String = UUID.randomUUID().toString(), // 購物車項目的唯一 ID
+    val id: String = UUID.randomUUID().toString(), // 1. ID
 
-    // 商品資訊 (建立快照，方便顯示)
-    val productId: String = "",
-    val productTitle: String = "",
-    val productPrice: String = "",
-    val productImage: String = "",
+    // 商品資訊
+    val productId: String = "",      // 2. 商品ID
+    val productTitle: String = "",   // 3. 標題
+    val productPrice: String = "",   // 4. 價格
+    val productImage: String = "",   // 5. 圖片
 
-    // 賣家資訊 (方便結帳時知道是跟誰買的)
-    val sellerId: String = "",
+    // 賣家資訊
+    val sellerId: String = "",       // 6. 賣家ID
 
     // 購物資訊
-    val quantity: Int = 1,           // 購買數量
-    val addedAt: Long = System.currentTimeMillis() // 加入時間
-)
+    var quantity: Int = 1,           // 7. 數量
+    val addedAt: Long = System.currentTimeMillis(), // 8. 加入時間
+
+    // 庫存與勾選
+    val stock: Int = 99,             // 9. 庫存
+    var isChecked: Boolean = false   // 10. 是否勾選
+) {
+    // 無參數建構子 (Firebase 讀取需要)
+    // 修正：補上 addedAt (0L) 的參數，確保參數數量對應上方定義
+    constructor() : this("", "", "", "0", "", "", 1, 0L, 99, false)
+}

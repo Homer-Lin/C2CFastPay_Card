@@ -1,136 +1,77 @@
 package com.example.c2cfastpay_card.UIScreen.components
 
 import android.content.Context
-import android.net.Uri
 import android.util.Log
-import com.example.c2cfastpay_card.data.User
-import com.google.firebase.auth.auth
+import com.example.c2cfastpay_card.model.WishItem // ★ 請確認您的 WishItem 是在哪個 package
+// 如果 WishItem 還在 components 資料夾，就改成: import com.example.c2cfastpay_card.UIScreen.components.WishItem
+
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.firestore
-import com.google.firebase.Firebase
-import com.google.firebase.storage.storage
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
-import java.util.UUID
 
 class WishRepository(private val context: Context) {
 
-    private val db = Firebase.firestore
-    private val auth = Firebase.auth
-    private val storage = Firebase.storage
-
-    private fun getCurrentUserId(): String? {
-        return auth.currentUser?.uid
-    }
+    private val db = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
+    private val wishCollection = db.collection("wishes") // 假設集合名稱叫 wishes
 
     /**
-     * 1. 新增願望 (包含圖片上傳)
-     */
-    suspend fun addWish(wish: WishItem) {
-        val userId = getCurrentUserId() ?: throw Exception("尚未登入")
-
-        // A. 取得使用者資料
-        val userSnapshot = db.collection("users").document(userId).get().await()
-        val user = userSnapshot.toObject(User::class.java)
-        val userName = user?.name ?: "未知用戶"
-        val userEmail = user?.email ?: ""
-
-        // B. 處理圖片上傳
-        var finalImageUrl = ""
-        if (wish.imageUri.isNotEmpty()) {
-            if (wish.imageUri.startsWith("content://") || wish.imageUri.startsWith("file://")) {
-                finalImageUrl = uploadImageToStorage(Uri.parse(wish.imageUri))
-            } else {
-                finalImageUrl = wish.imageUri
-            }
-        }
-
-        // C. 準備資料
-        val newWish = wish.copy(
-            imageUri = finalImageUrl,
-            ownerId = userId,
-            ownerName = userName,
-            ownerEmail = userEmail,
-            timestamp = System.currentTimeMillis()
-        )
-
-        // D. 寫入 Firestore
-        db.collection("wishes")
-            .document(newWish.uuid)
-            .set(newWish)
-            .await()
-
-        Log.d("WishRepository", "許願成功: ${newWish.title}")
-    }
-
-    /**
-     * 2. 取得許願清單 (即時監聽 Flow，支援搜尋)
-     * 【關鍵修改】這裡必須加入 searchQuery 參數
+     * 取得願望列表 (即時監聽 + 搜尋過濾)
      */
     fun getWishListFlow(searchQuery: String = ""): Flow<List<WishItem>> = callbackFlow {
-        val userId = getCurrentUserId()
+        var query: Query = wishCollection
 
-        var baseQuery = db.collection("wishes")
-
-        // 如果搜尋關鍵字不為空，則加入篩選條件
-        val finalQuery = if (searchQuery.isNotBlank()) {
-            // 使用前綴搜尋
-            baseQuery.whereGreaterThanOrEqualTo("title", searchQuery)
+        // 簡單的搜尋邏輯：如果有輸入關鍵字，就篩選標題
+        // 注意：Firestore 的全文檢索能力有限，這裡用簡單的範圍搜尋
+        if (searchQuery.isNotBlank()) {
+            query = query.whereGreaterThanOrEqualTo("title", searchQuery)
                 .whereLessThanOrEqualTo("title", searchQuery + "\uf8ff")
-                .orderBy("title", Query.Direction.ASCENDING)
         } else {
-            // 否則使用原本的時間排序
-            baseQuery.orderBy("timestamp", Query.Direction.DESCENDING)
+            // 沒搜尋時，依照時間排序 (最新的在上面)
+            query = query.orderBy("timestamp", Query.Direction.DESCENDING)
         }
 
-        val registration = finalQuery
-            .addSnapshotListener { snapshot, e ->
-                if (e != null) {
-                    Log.w("WishRepository", "Listen failed.", e)
-                    trySend(emptyList())
-                    return@addSnapshotListener
-                }
-
-                if (snapshot != null) {
-                    val wishes = snapshot.toObjects(WishItem::class.java)
-                    trySend(wishes)
-                }
+        val listener = query.addSnapshotListener { snapshot: QuerySnapshot?, e: FirebaseFirestoreException? ->
+            if (e != null) {
+                Log.w("WishRepository", "Listen failed.", e)
+                trySend(emptyList())
+                return@addSnapshotListener
             }
 
-        awaitClose { registration.remove() }
+            if (snapshot != null) {
+                val allWishes = snapshot.toObjects(WishItem::class.java)
+                trySend(allWishes)
+            }
+        }
+
+        awaitClose { listener.remove() }
     }
 
     /**
-     * 3. 根據 UUID 取得單一願望
+     * 根據 UUID 取得單一願望 (給詳情頁用)
      */
     suspend fun getWishByUuid(uuid: String): WishItem? {
-        try {
-            val doc = db.collection("wishes").document(uuid).get().await()
-            return doc.toObject(WishItem::class.java)
+        return try {
+            // 因為我們是用 uuid 欄位存 ID，而不是 Document ID，所以要用 whereEqualTo 查
+            val snapshot = wishCollection
+                .whereEqualTo("uuid", uuid)
+                .get()
+                .await()
+
+            if (!snapshot.isEmpty) {
+                snapshot.documents.first().toObject(WishItem::class.java)
+            } else {
+                null
+            }
         } catch (e: Exception) {
-            Log.e("WishRepository", "找不到願望: $uuid", e)
-            return null
+            Log.e("WishRepository", "Get wish failed", e)
+            null
         }
-    }
-
-    /**
-     * 4. 刪除願望
-     */
-    suspend fun deleteWish(wishId: String) {
-        db.collection("wishes")
-            .document(wishId)
-            .delete()
-            .await()
-    }
-
-    private suspend fun uploadImageToStorage(uri: Uri): String {
-        val userId = getCurrentUserId() ?: return ""
-        val filename = "wishes/$userId/${UUID.randomUUID()}.jpg"
-        val ref = storage.reference.child(filename)
-
-        ref.putFile(uri).await()
-        return ref.downloadUrl.await().toString()
     }
 }

@@ -17,6 +17,12 @@ data class ProductItem(
     val ownerId: String = "",       // 賣家的 Firebase UID
     val ownerName: String = "",     // 賣家的暱稱 (顯示在卡片上)
     val ownerEmail: String = "",    // 賣家的信箱
+    val story: String = "",       // 商品故事
+    val stock: String = "1",      // 庫存 (預設 1)
+    val condition: String = "全新", // 新舊狀態 (預設 全新)
+    //val logistics: String = "",    // 物流方式
 
     val timestamp: Long = System.currentTimeMillis() // 上架時間 (用於排序)
+
+
 )

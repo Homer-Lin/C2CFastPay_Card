@@ -1,18 +1,14 @@
 package com.example.c2cfastpay_card.UIScreen.Screens
 
-import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MonetizationOn
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,93 +22,65 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
-import com.example.c2cfastpay_card.UIScreen.components.CartRepository
-import com.example.c2cfastpay_card.UIScreen.components.ProductItem
-import com.example.c2cfastpay_card.UIScreen.components.ProductRepository
-import com.example.c2cfastpay_card.navigation.Screen
-import com.example.c2cfastpay_card.ui.theme.SaleColorScheme
+import com.example.c2cfastpay_card.UIScreen.components.WishRepository
+import com.example.c2cfastpay_card.model.WishItem // 假設你的 Model 在這
 import kotlinx.coroutines.launch
 
-// --- 定義顏色 (保持 Figma 風格) ---
-val MintGreenAccent = Color(0xFFE0F2F1)
-val MintGreenDark = Color(0xFF487F81)
-val TextBlack = Color(0xFF191C1C)
+// --- 許願牆主題色 (黃/橘系) ---
+val WishYellowAccent = Color(0xFFFFF176) // 淺黃標題底
+val WishOrangeDark = Color(0xFFFF9800)   // 橘色按鈕
+val WishTextBlack = Color(0xFF191C1C)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProductDetailScreen(
+fun WishDetailScreen(
     navController: NavController,
-    productId: String
+    wishUuid: String // 接收參數
 ) {
     val context = LocalContext.current
-    val productRepository = remember { ProductRepository(context) }
-    var product by remember { mutableStateOf<ProductItem?>(null) }
+    val wishRepository = remember { WishRepository(context) }
+    var wishItem by remember { mutableStateOf<WishItem?>(null) }
     var isLoading by remember { mutableStateOf(true) }
-    val cartRepository = remember { CartRepository(context) }
-    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(productId) {
-        product = productRepository.getProductById(productId)
+    // 載入資料
+    LaunchedEffect(wishUuid) {
+        wishItem = wishRepository.getWishByUuid(wishUuid)
         isLoading = false
     }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("商品詳情", fontWeight = FontWeight.Bold) },
+                title = { Text("願望詳情", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { navController.navigate(Screen.Cart.route) }) {
-                        Icon(Icons.Default.ShoppingCart, contentDescription = "購物車", tint = MintGreenDark)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.White)
             )
         },
         bottomBar = {
-            if (product != null) {
+            if (wishItem != null) {
                 BottomAppBar(
                     containerColor = Color.White,
                     tonalElevation = 8.dp
                 ) {
                     Spacer(modifier = Modifier.weight(1f))
+                    // 快速上架按鈕
                     Button(
                         onClick = {
-                            val item = product
-                            if (item != null) {
-                                scope.launch {
-                                    // 1. 建立 CartItem 物件
-                                    val cartItem = com.example.c2cfastpay_card.data.CartItem(
-                                        productId = item.id,
-                                        productTitle = item.title,
-                                        productPrice = item.price,
-                                        productImage = item.imageUri,
-                                        sellerId = item.ownerId,
-                                        // ★ 關鍵：把庫存傳進去 (如果是空的預設 1)
-                                        stock = item.stock.toIntOrNull() ?: 1
-                                    )
-
-                                    // 2. 加入購物車 (假設 Repository 已更新為回傳 Boolean)
-                                    // 如果你的 Repository 還沒更新回傳值，把下面改成直接呼叫即可
-                                    cartRepository.addToCart(cartItem)
-                                    Toast.makeText(context, "已加入購物車", Toast.LENGTH_SHORT).show()
-                                }
-                            }
+                            // 帶著 UUID 跳轉到 AddProductScreen
+                            navController.navigate("add_product?wishUuid=${wishItem!!.uuid}")
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = MintGreenDark),
+                        colors = ButtonDefaults.buttonColors(containerColor = WishOrangeDark),
                         shape = RoundedCornerShape(50),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
                             .height(50.dp)
                     ) {
-                        Icon(Icons.Default.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("加入購物車", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("我有這個商品！快速上架", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -120,18 +88,17 @@ fun ProductDetailScreen(
     ) { innerPadding ->
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = MintGreenDark)
+                CircularProgressIndicator(color = WishOrangeDark)
             }
         } else {
-            val item = product
+            val item = wishItem
             if (item != null) {
-                // --- 變數準備 ---
-                val rawStory = if (item.story.isNullOrBlank()) "" else item.story
-                val displayStock = if (item.stock.isNullOrBlank()) "1" else item.stock
-                val displayCondition = if (item.condition.isNullOrBlank()) "全新" else item.condition
-                // 物流顯示：優先顯示 payment
-                val displayLogistics = item.payment.ifBlank { "7-11、全家、面交" }
-                val displayDescription = if (item.description.isNullOrBlank()) "賣家沒有留下文案。" else item.description
+                // --- 準備變數 (若無資料顯示預設值) ---
+                val displayDesc = item.description.ifBlank { "沒有詳細描述。" }
+                val displayLogistics = item.payment.ifBlank { "皆可" } // 物流
+                val displayCondition = item.condition.ifBlank { "不拘" }
+                val displayQty = item.qty.ifBlank { "1" }
+                val displayNote = item.memo.ifBlank { "無備註" } // 備註
 
                 Column(
                     modifier = Modifier
@@ -143,7 +110,7 @@ fun ProductDetailScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
 
-                    // 1. 主要圖片
+                    // 1. 圖片 (參考圖片)
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -160,76 +127,45 @@ fun ProductDetailScreen(
                             )
                         } else {
                             Box(
-                                modifier = Modifier.fillMaxSize().background(Color.LightGray),
+                                modifier = Modifier.fillMaxSize().background(Color(0xFFFFF8E1)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("無圖片", color = Color.White)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // 2. 小縮圖列
-                    val images = listOf(item.imageUri, item.imageUri, item.imageUri)
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(images) { imgUri ->
-                            if (imgUri.isNotEmpty()) {
-                                Card(
-                                    modifier = Modifier.size(60.dp),
-                                    shape = RoundedCornerShape(12.dp),
-                                    border = null
-                                ) {
-                                    Image(
-                                        painter = rememberAsyncImagePainter(model = imgUri),
-                                        contentDescription = null,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                }
+                                Text("無參考圖片", color = Color.Gray)
                             }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // 3. 商品標題
+                    // 2. 標題
                     Box(contentAlignment = Alignment.Center) {
                         Box(
                             modifier = Modifier
-                                .width(220.dp)
+                                .width(200.dp)
                                 .height(16.dp)
                                 .offset(y = 10.dp)
-                                .background(MintGreenAccent, RoundedCornerShape(50))
+                                .background(WishYellowAccent, RoundedCornerShape(50))
                         )
                         Text(
                             text = item.title,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = TextBlack,
+                            color = WishTextBlack,
                             textAlign = TextAlign.Center
                         )
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // 4. 詳細資訊區 (物流、價格、規格)
+                    // 3. 詳細資訊 (兩欄配置)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.Top
                     ) {
-                        // 左欄：物流、價格
+                        // 左欄：預算、物流
                         Column(modifier = Modifier.weight(1f)) {
-                            SectionTitle("物流方式")
-                            Text(text = displayLogistics, fontSize = 14.sp, color = Color.DarkGray)
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            SectionTitle("商品價格")
+                            WishSectionTitle("預算")
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.MonetizationOn,
@@ -242,19 +178,24 @@ fun ProductDetailScreen(
                                     text = item.price,
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextBlack
+                                    color = WishTextBlack
                                 )
                             }
+
+                            Spacer(modifier = Modifier.height(24.dp))
+
+                            WishSectionTitle("物流方式")
+                            Text(text = displayLogistics, fontSize = 14.sp, color = Color.DarkGray)
                         }
 
                         Spacer(modifier = Modifier.width(24.dp))
 
-                        // 右欄：規格 (庫存、狀態)
+                        // 右欄：需求規格 (數量、狀態)
                         Column(modifier = Modifier.weight(1f)) {
-                            SectionTitle("商品規格")
+                            WishSectionTitle("需求規格")
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                SpecText(label = "庫存", value = displayStock)
-                                SpecText(label = "狀態", value = displayCondition)
+                                WishSpecText(label = "欲購數量", value = displayQty)
+                                WishSpecText(label = "接受狀態", value = displayCondition)
                             }
                         }
                     }
@@ -263,12 +204,12 @@ fun ProductDetailScreen(
                     Divider(color = Color.LightGray.copy(alpha = 0.5f), thickness = 1.dp)
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // 5. 商品文案 (在中間)
+                    // 4. 願望描述 (文案)
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        SectionTitle("商品文案")
+                        WishSectionTitle("願望描述")
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = displayDescription,
+                            text = displayDesc,
                             fontSize = 15.sp,
                             color = Color.DarkGray,
                             lineHeight = 22.sp,
@@ -276,57 +217,49 @@ fun ProductDetailScreen(
                         )
                     }
 
-                    // 6. 商品故事 (在最底，有資料才顯示)
-                    if (rawStory.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // 5. 備註
+                    if (displayNote.isNotBlank() && displayNote != "無備註") {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            SectionTitle("商品故事")
+                            WishSectionTitle("備註")
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = rawStory,
-                                fontSize = 13.sp,
-                                color = Color.DarkGray,
-                                lineHeight = 18.sp,
-                                modifier = Modifier.fillMaxWidth()
+                                text = displayNote,
+                                fontSize = 14.sp,
+                                color = Color.Gray,
+                                lineHeight = 20.sp
                             )
                         }
+                        Spacer(modifier = Modifier.height(40.dp))
                     }
-
-                    Spacer(modifier = Modifier.height(40.dp))
                 }
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("找不到該商品")
+                    Text("找不到該願望")
                 }
             }
         }
     }
 }
 
+// --- 許願專用樣式元件 ---
 @Composable
-fun SectionTitle(text: String) {
-    Box(
-        modifier = Modifier.padding(bottom = 8.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
+fun WishSectionTitle(text: String) {
+    Box(modifier = Modifier.padding(bottom = 8.dp), contentAlignment = Alignment.CenterStart) {
         Box(
             modifier = Modifier
                 .width(60.dp)
                 .height(10.dp)
                 .offset(y = 6.dp)
-                .background(MintGreenAccent, RoundedCornerShape(4.dp))
+                .background(WishYellowAccent, RoundedCornerShape(4.dp))
         )
-        Text(
-            text = text,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = TextBlack
-        )
+        Text(text = text, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = WishTextBlack)
     }
 }
 
 @Composable
-fun SpecText(label: String, value: String) {
+fun WishSpecText(label: String, value: String) {
     Row {
         Text(text = "$label : ", fontSize = 13.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
         Text(text = value, fontSize = 13.sp, color = Color.DarkGray)
