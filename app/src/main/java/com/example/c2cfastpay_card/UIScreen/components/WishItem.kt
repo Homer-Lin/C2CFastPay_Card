@@ -1,24 +1,26 @@
-package com.example.c2cfastpay_card.UIScreen.components
+package com.example.c2cfastpay_card.model // 請確認 package 路徑
 
 import java.util.UUID
 
 data class WishItem(
-    val title: String = "",
-    val price: String = "",
-    val payment: String = "",
-    val imageUri: String = "", // 這裡之後會存 "https://..." 的雲端網址
     val uuid: String = UUID.randomUUID().toString(), // 文件 ID
 
-    // 您的詳細資料欄位
+    // 基本資訊
+    val title: String = "",
+    val price: String = "",
+    val payment: String = "", // 物流方式
+    val imageUri: String = "",
+
+    // 詳細資訊 (對應詳情頁 UI)
     val description: String = "",
-    val specs: String = "",
-    val notes: String = "",
-    val other: String = "",
+    val qty: String = "1",          // ★ 新增：欲購數量
+    val condition: String = "皆可", // ★ 新增：新舊狀態
+    val memo: String = "",          // ★ 新增：備註 (取代 notes)
 
-    // 【新增】擁有者資訊 (C2C 核心)
+    // 擁有者資訊 (C2C 核心)
     val ownerId: String = "",       // 許願者的 Firebase UID
-    val ownerName: String = "",     // 許願者的暱稱
-    val ownerEmail: String = "",    // 許願者的信箱
+    val ownerName: String = "",     // ★ 關鍵：許願者暱稱
+    val ownerEmail: String = "",
 
-    val timestamp: Long = System.currentTimeMillis() // 許願時間
+    val timestamp: Long = System.currentTimeMillis()
 )

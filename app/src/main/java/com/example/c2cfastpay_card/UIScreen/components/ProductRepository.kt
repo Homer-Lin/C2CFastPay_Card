@@ -86,7 +86,7 @@ class ProductRepository(private val context: Context) { // Context 雖然這裡�
     }
 
     /**
-     * 2. 取得「所有」商品 (改為 Flow 以便即時更新)
+     * 2. 取得「所有」商品 (使用 Flow)
      * 這裡可以用來在首頁顯示
      */
     fun getAllProducts(searchQuery: String = ""): Flow<List<ProductItem>> = flow {
@@ -134,6 +134,9 @@ class ProductRepository(private val context: Context) { // Context 雖然這裡�
             .shuffled() // 隨機排序，增加配對趣味性
     }
 
+    /**
+     * 4. 根據 ID 取得單一商品詳情
+     */
     suspend fun getProductById(productId: String): ProductItem? {
         return try {
             val document = db.collection("products")
@@ -146,6 +149,11 @@ class ProductRepository(private val context: Context) { // Context 雖然這裡�
             null
         }
     }
+
+    /**
+     * 5. 取得「我」上架的商品
+     * 用於 User 頁面管理自己的商品
+     */
     suspend fun getMyProducts(): List<ProductItem> {
         val userId = getCurrentUserId() ?: return emptyList()
 
@@ -159,11 +167,19 @@ class ProductRepository(private val context: Context) { // Context 雖然這裡�
 
         return snapshot.toObjects(ProductItem::class.java)
     }
+
+    /**
+     * 6. 刪除商品
+     */
     suspend fun deleteProduct(productId: String) {
+        // 1. 刪除 Firestore 資料
         db.collection("products")
             .document(productId)
             .delete()
             .await()
-        // 選擇性：如果有上傳圖片，這裡也應該去 Storage 刪除圖片
+
+        // 2. (選做) 若要更完整，這裡可以加邏輯去 Storage 刪除對應圖片
+        // 但需要先知道圖片路徑，通常需要先讀取 ProductItem 拿到 url 進行解析
+        Log.d("ProductRepository", "商品刪除成功: $productId")
     }
 }

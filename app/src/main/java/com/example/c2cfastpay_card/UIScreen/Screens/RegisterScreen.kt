@@ -39,6 +39,9 @@ fun RegisterScreen(
     val viewModel: RegisterViewModel = viewModel()
     val primaryColor = Color(0xFF487F81)
 
+    // ★★★ 修正重點：在這裡宣告狀態變數，解決 Unresolved reference ★★★
+    var showPrivacyDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -71,7 +74,6 @@ fun RegisterScreen(
                 leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null, tint = primaryColor) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                // 【修正】移除 colors 參數以解決編譯錯誤
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 isError = viewModel.errorMessage.contains("帳號")
@@ -87,7 +89,6 @@ fun RegisterScreen(
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = primaryColor) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                // 【修正】移除 colors 參數
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                 isError = viewModel.errorMessage.contains("信箱")
@@ -104,7 +105,6 @@ fun RegisterScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 visualTransformation = PasswordVisualTransformation(),
-                // 【修正】移除 colors 參數
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
                 isError = viewModel.errorMessage.contains("密碼")
@@ -121,7 +121,6 @@ fun RegisterScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 visualTransformation = PasswordVisualTransformation(),
-                // 【修正】移除 colors 參數
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                 isError = viewModel.errorMessage.contains("不一致")
@@ -145,10 +144,66 @@ fun RegisterScreen(
                     color = primaryColor,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    modifier = Modifier.clickable { /* 之後加隱私條款連結 */ }
+                    modifier = Modifier.clickable {
+                        // 點擊觸發彈窗
+                        showPrivacyDialog = true
+                    }
                 )
             }
 
+            // --- 隱私條款彈窗邏輯 ---
+            if (showPrivacyDialog) {
+                AlertDialog(
+                    onDismissRequest = { showPrivacyDialog = false },
+                    containerColor = Color.White,
+                    title = {
+                        Text(text = "隱私權條款", fontWeight = FontWeight.Bold)
+                    },
+                    text = {
+                        Column(
+                            modifier = Modifier
+                                .heightIn(max = 400.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            Text(
+                                text = """
+                                    1. 隱私權保護政策
+                                    本政策說明我們如何蒐集、使用、揭露、移轉與保護您的個人資料。
+
+                                    2. 個人資料的蒐集與使用
+                                    您註冊或使用服務時，我們可能蒐集姓名、Email、聯絡方式、使用紀錄等資料，並僅用於提供服務、帳號管理、客服、資訊通知及改善產品之目的。
+                                    
+                                    3. 資料保護
+                                    我們採行合理技術與管理措施，以防止資料遭未經授權之存取、使用、修改或洩漏。
+                                    
+                                    4. 資料揭露與移轉
+                                    除法律要求或為提供服務必要（如第三方服務供應商），我們不會向任何無關單位揭露您的資料，並確保接收方遵守相同保護標準。
+                                    
+                                    5. 資料保存期間
+                                    資料僅在達成蒐集目的所需期間內保存，期滿後將刪除或匿名化。
+                                    
+                                    6. 您的權利
+                                    您可依個資法請求查詢、更正、刪除、停止使用或撤回同意。我們將於法定期限內處理。
+                                    
+                                    7. 政策更新
+                                    本政策可能因服務或法規調整而更新；更新後將立即生效並公布於網站或APP。
+                                """.trimIndent(),
+                                fontSize = 14.sp,
+                                color = Color.DarkGray
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = { showPrivacyDialog = false }
+                        ) {
+                            Text("我了解了", color = primaryColor, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                )
+            }
+
+            // 錯誤訊息顯示
             if (viewModel.errorMessage.isNotEmpty()) {
                 Text(
                     text = viewModel.errorMessage,
@@ -165,7 +220,6 @@ fun RegisterScreen(
                 onClick = {
                     viewModel.register(
                         onSuccess = {
-                            // 註冊成功後導航到登入頁
                             navController.navigate(Screen.Login.route) {
                                 popUpTo(Screen.Register.route) { inclusive = true }
                             }

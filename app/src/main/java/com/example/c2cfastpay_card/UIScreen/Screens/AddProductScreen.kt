@@ -35,19 +35,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.navigation.NavController
-import com.example.c2cfastpay_card.navigation.Screen
 import coil.compose.rememberAsyncImagePainter
+import com.example.c2cfastpay_card.navigation.Screen
 import com.google.gson.Gson
-// import com.example.c2cfastpay_card.model.DraftProduct (請解開您的 import)
 
-// 暫時定義，請使用您專案原本的
-data class DraftProduct(
-    val imageUri: String = "",
+// 為了方便解析 JSON，我們定義一個簡單的資料結構來接 WishItem 的資料
+data class WishDataDTO(
     val title: String = "",
-    val description: String = "",
-    val story: String = "",
-    val condition: String = "",
-    val fromAI: Boolean = false
+    val price: String = "",       // 預算 -> 變價格
+    val description: String = "", // 描述 -> 變文案
+    val qty: String = "",         // 數量 -> 變庫存
+    val payment: String = "",     // 物流字串
+    val imageUri: String = "",
+    val condition: String = ""
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,8 +59,8 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
     // --- 1. 狀態變數 ---
     var photoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
-    var story by remember { mutableStateOf("") }
+    var content by remember { mutableStateOf("") } // 商品文案
+    var story by remember { mutableStateOf("") }   // 商品故事
     var price by remember { mutableStateOf("") }
     var stock by remember { mutableStateOf("1") }
 
@@ -71,25 +71,41 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
     val logisticOptions = listOf("7-11", "全家", "面交")
     var selectedLogistics by remember { mutableStateOf(setOf<String>()) }
 
-    // --- 2. 接收外部資料 ---
+    // --- 2. 接收外部資料 (自動填入邏輯) ---
     LaunchedEffect(draftJson) {
         if (!draftJson.isNullOrEmpty() && draftJson != "null") {
             try {
-                val decodedJson = java.net.URLDecoder.decode(draftJson, "UTF-8")
-                val draft = Gson().fromJson(decodedJson, DraftProduct::class.java)
+                val wishData = Gson().fromJson(draftJson, WishDataDTO::class.java)
 
-                if (draft.imageUri.isNotEmpty()) {
-                    val uri = draft.imageUri.toUri()
+                if (wishData.title.isNotEmpty()) title = wishData.title
+                if (wishData.description.isNotEmpty()) content = wishData.description
+                if (wishData.price.isNotEmpty()) price = wishData.price
+                if (wishData.qty.isNotEmpty()) stock = wishData.qty
+
+                if (wishData.imageUri.isNotEmpty()) {
+                    val uri = wishData.imageUri.toUri()
                     if (!photoUris.contains(uri)) photoUris = photoUris + uri
                 }
-                if (draft.fromAI) {
-                    title = draft.title
-                    content = draft.description
-                    story = draft.story
-                    if (draft.condition in statusOptions) selectedStatus = draft.condition
+
+                if (wishData.condition == "全新") {
+                    selectedStatus = "全新"
+                } else {
+                    selectedStatus = "二手"
                 }
+
+                if (wishData.payment.isNotEmpty()) {
+                    val newLogistics = mutableSetOf<String>()
+                    if (wishData.payment.contains("7-11")) newLogistics.add("7-11")
+                    if (wishData.payment.contains("全家")) newLogistics.add("全家")
+                    if (wishData.payment.contains("面交")) newLogistics.add("面交")
+
+                    if (newLogistics.isNotEmpty()) {
+                        selectedLogistics = newLogistics
+                    }
+                }
+                Log.d("AddProductScreen", "已自動帶入許願資料: ${wishData.title}")
             } catch (e: Exception) {
-                Log.e("AddProductScreen", "解析失敗", e)
+                Log.e("AddProductScreen", "解析失敗，可能是格式不符", e)
             }
         }
     }
@@ -109,22 +125,19 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
-                // ★★★ 這裡新增了右上角的許願按鈕 ★★★
                 actions = {
                     Button(
                         onClick = {
-                            // 請確認這是您 Navigation 中定義的 route 名稱 (如 Screen.AddWish.route)
                             navController.navigate(Screen.AddWish.route)
-
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFFF9800) // 橘色背景
+                            containerColor = Color(0xFFFF9800)
                         ),
-                        shape = RoundedCornerShape(50), // 圓角
+                        shape = RoundedCornerShape(50),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                         modifier = Modifier
                             .padding(end = 12.dp)
-                            .height(36.dp) // 高度稍微設小一點，比較精緻
+                            .height(36.dp)
                     ) {
                         Text(
                             text = "我要許願",
@@ -134,7 +147,6 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                         )
                     }
                 },
-                // ★★★ 結束 ★★★
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = Color.White
                 )
@@ -255,9 +267,12 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = statusExpanded) },
                     modifier = Modifier.menuAnchor().fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
+                    // ★★★ 這裡也加上了黑色文字設定 ★★★
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White
+                        unfocusedContainerColor = Color.White,
+                        focusedTextColor = Color.Black,   // 聚焦時文字黑色
+                        unfocusedTextColor = Color.Black  // 失焦時文字黑色
                     )
                 )
                 ExposedDropdownMenu(
@@ -316,7 +331,8 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                         Toast.makeText(context, "請填寫完整資訊 (標題、文案、價格、物流)", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-                    Toast.makeText(context, "商品上架成功", Toast.LENGTH_SHORT).show()
+                    // TODO: 這裡要連接 Firebase Repository 做寫入
+                    Toast.makeText(context, "商品上架成功 (模擬)", Toast.LENGTH_SHORT).show()
                     navController.popBackStack()
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -347,11 +363,14 @@ fun MyTextField(
         singleLine = singleLine,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         shape = RoundedCornerShape(12.dp),
+        // ★★★ 關鍵修改：強制設定文字顏色為黑色 ★★★
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = Color.White,
             unfocusedContainerColor = Color.White,
             focusedBorderColor = Color(0xFF759E9F),
-            unfocusedBorderColor = Color.LightGray
+            unfocusedBorderColor = Color.LightGray,
+            focusedTextColor = Color.Black,   // 聚焦時文字黑色
+            unfocusedTextColor = Color.Black  // 失焦時文字黑色
         )
     )
 }

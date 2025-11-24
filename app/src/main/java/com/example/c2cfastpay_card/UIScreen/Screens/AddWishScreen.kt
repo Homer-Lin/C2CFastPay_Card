@@ -81,15 +81,14 @@ fun AddWishScreen(navController: NavController) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
-                // ★★★ 右上角按鈕：樣式依照要求 (綠色框/底)，文字改為"我要上架"以便切換 ★★★
+                // 右上角按鈕：樣式依照要求 (綠色框/底)，文字改為"我要上架"
                 actions = {
                     Button(
                         onClick = {
-                            // 這裡導航去 "上架第一步" (AddStep1)
                             navController.navigate(Screen.AddStep1.route)
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = buttonGreenColor // 指定的綠色 0xFF487F81
+                            containerColor = buttonGreenColor
                         ),
                         shape = RoundedCornerShape(50),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
@@ -98,7 +97,7 @@ fun AddWishScreen(navController: NavController) {
                             .height(36.dp)
                     ) {
                         Text(
-                            text = "我要上架", // 切換回上架模式
+                            text = "我要上架",
                             color = Color.White,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
@@ -115,7 +114,7 @@ fun AddWishScreen(navController: NavController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color(0xFFFFF8E1)) // 背景改為非常淡的橘黃色，或是保持 F9F9F9 也可以
+                .background(Color(0xFFFFF8E1)) // 淡橘黃色背景
                 .verticalScroll(scrollState)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -227,12 +226,14 @@ fun AddWishScreen(navController: NavController) {
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = statusExpanded) },
                     modifier = Modifier.menuAnchor().fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
+                    // ★★★ 設定下拉選單文字顏色為黑色 ★★★
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
-                        // ★ 設定聚焦顏色為橘色
                         focusedBorderColor = mainOrangeColor,
-                        focusedLabelColor = mainOrangeColor
+                        focusedLabelColor = mainOrangeColor,
+                        focusedTextColor = Color.Black,   // 聚焦時黑色
+                        unfocusedTextColor = Color.Black  // 失焦時黑色
                     )
                 )
                 ExposedDropdownMenu(
@@ -253,7 +254,7 @@ fun AddWishScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // --- 備註 (新增欄位) ---
+            // --- 備註 ---
             WishTextField(
                 value = note,
                 onValueChange = { note = it },
@@ -282,7 +283,7 @@ fun AddWishScreen(navController: NavController) {
                         },
                         label = { Text(option) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = mainOrangeColor, // ★ 選中變成橘色
+                            selectedContainerColor = mainOrangeColor,
                             selectedLabelColor = Color.White
                         ),
                         border = FilterChipDefaults.filterChipBorder(
@@ -310,7 +311,7 @@ fun AddWishScreen(navController: NavController) {
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = mainOrangeColor) // ★ 按鈕橘色
+                colors = ButtonDefaults.buttonColors(containerColor = mainOrangeColor)
             ) {
                 Text("確認許願", fontSize = 18.sp, color = Color.White)
             }
@@ -339,12 +340,15 @@ fun WishTextField(
         singleLine = singleLine,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         shape = RoundedCornerShape(12.dp),
+        // ★★★ 關鍵修改：強制設定文字顏色為黑色 ★★★
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = Color.White,
             unfocusedContainerColor = Color.White,
-            focusedBorderColor = themeColor, // 傳入橘色
+            focusedBorderColor = themeColor,
             unfocusedBorderColor = Color.LightGray,
-            focusedLabelColor = themeColor   // Label 也變橘色
+            focusedLabelColor = themeColor,
+            focusedTextColor = Color.Black,   // 聚焦時黑色
+            unfocusedTextColor = Color.Black  // 失焦時黑色
         )
     )
 }

@@ -14,9 +14,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.c2cfastpay_card.R
 import com.example.c2cfastpay_card.navigation.Screen
-import androidx.navigation.NavGraph.Companion.findStartDestination
 
 @Composable
 fun BottomNavigationBar(navController: NavController) {
@@ -28,23 +28,29 @@ fun BottomNavigationBar(navController: NavController) {
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Home 按鈕
-        IconButton(onClick = { navController.navigate(Screen.Sale.route) {
-            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }}) {
+        // ==========================================
+        // 1. Home 按鈕 (Screen.Sale)
+        // ==========================================
+        IconButton(onClick = {
+            navController.navigate(Screen.Sale.route) {
+                // 使用 findStartDestination() 確保回到圖表的起始點，避免堆疊過深
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }) {
             Icon(
                 painter = painterResource(R.drawable.img_2),
                 contentDescription = "Home"
             )
         }
 
-        // Add 按鈕
+        // ==========================================
+        // 2. Add 按鈕 (Screen.WishOrProduct)
+        // ==========================================
         IconButton(onClick = {
-            // ★ 修改這裡：連到選擇頁面
             navController.navigate(Screen.WishOrProduct.route) {
-                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
@@ -55,21 +61,27 @@ fun BottomNavigationBar(navController: NavController) {
             )
         }
 
-        // Connect 按鈕
-        IconButton(onClick = { navController.navigate(Screen.CardStack.route){
-            popUpTo(navController.graph.startDestinationId) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }}) {
+        // ==========================================
+        // 3. Connect 按鈕 (Screen.CardStack)
+        // ==========================================
+        IconButton(onClick = {
+            navController.navigate(Screen.CardStack.route) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }) {
             Icon(
                 painter = painterResource(R.drawable.img_4),
                 contentDescription = "Connect"
             )
         }
 
-        // Chat 按鈕
+        // ==========================================
+        // 4. Chat 按鈕 (Screen.History)
+        // ==========================================
         IconButton(onClick = {
-            // 【修改】導航到「聊天列表 (History)」
+            // 採用程式碼 A 的實作，導航至 History
             navController.navigate(Screen.History.route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
@@ -82,9 +94,11 @@ fun BottomNavigationBar(navController: NavController) {
             )
         }
 
-        // User 按鈕
+        // ==========================================
+        // 5. User 按鈕 (Screen.User)
+        // ==========================================
         IconButton(onClick = {
-            // 【修改】導航到「會員中心 (User)」
+            // 採用程式碼 A 的實作，導航至 User
             navController.navigate(Screen.User.route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
