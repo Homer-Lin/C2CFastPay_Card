@@ -2,27 +2,36 @@ package com.example.c2cfastpay_card.UIScreen.components
 
 import java.util.UUID
 
+/**
+ * 商品資料模型
+ */
 data class ProductItem(
     val id: String = UUID.randomUUID().toString(),
     val title: String = "",
     val description: String = "",
     val specs: String = "",
     val price: String = "",
+
+    // 物流方式
     val payment: String = "",
+
     val notes: String = "",
     val other: String = "",
-    val imageUri: String = "", // 這裡之後會存 "https://..." 的雲端網址
 
-    // 【新增】擁有者資訊 (C2C 核心)
-    val ownerId: String = "",       // 賣家的 Firebase UID
-    val ownerName: String = "",     // 賣家的暱稱 (顯示在卡片上)
-    val ownerEmail: String = "",    // 賣家的信箱
-    val story: String = "",       // 商品故事
-    val stock: String = "1",      // 庫存 (預設 1)
-    val condition: String = "全新", // 新舊狀態 (預設 全新)
-    //val logistics: String = "",    // 物流方式
+    // 單張圖片 (相容舊程式碼 / 列表顯示用)
+    val imageUri: String = "",
 
-    val timestamp: Long = System.currentTimeMillis() // 上架時間 (用於排序)
+    // ★★★【新增】多張圖片支援 ★★★
+    val images: List<String> = emptyList(),
 
+    // 擁有者資訊
+    val ownerId: String = "",
+    val ownerName: String = "",
+    val ownerEmail: String = "",
 
+    val story: String = "",
+    val stock: String = "1",
+    val condition: String = "全新",
+
+    val timestamp: Long = System.currentTimeMillis()
 )
