@@ -28,42 +28,29 @@ fun BottomNavigationBar(navController: NavController) {
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // ==========================================
-        // 1. Home 按鈕 (Screen.Sale)
-        // ==========================================
+        // 1. Home
         IconButton(onClick = {
             navController.navigate(Screen.Sale.route) {
-                // 使用 findStartDestination() 確保回到圖表的起始點，避免堆疊過深
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
         }) {
-            Icon(
-                painter = painterResource(R.drawable.img_2),
-                contentDescription = "Home"
-            )
+            Icon(painter = painterResource(R.drawable.img_2), contentDescription = "Home")
         }
 
-        // ==========================================
-        // 2. Add 按鈕 (Screen.WishOrProduct)
-        // ==========================================
+        // 2. Add (修改處：改回導向 WishOrProductScreen)
         IconButton(onClick = {
-            navController.navigate(Screen.WishOrProduct.route) {
+            navController.navigate(Screen.WishOrProduct.route) { // <--- 改回這裡
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
         }) {
-            Icon(
-                painter = painterResource(R.drawable.img_3),
-                contentDescription = "Add"
-            )
+            Icon(painter = painterResource(R.drawable.img_3), contentDescription = "Add")
         }
 
-        // ==========================================
-        // 3. Connect 按鈕 (Screen.CardStack)
-        // ==========================================
+        // 3. Connect
         IconButton(onClick = {
             navController.navigate(Screen.CardStack.route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
@@ -71,44 +58,29 @@ fun BottomNavigationBar(navController: NavController) {
                 restoreState = true
             }
         }) {
-            Icon(
-                painter = painterResource(R.drawable.img_4),
-                contentDescription = "Connect"
-            )
+            Icon(painter = painterResource(R.drawable.img_4), contentDescription = "Connect")
         }
 
-        // ==========================================
-        // 4. Chat 按鈕 (Screen.History)
-        // ==========================================
+        // 4. Chat
         IconButton(onClick = {
-            // 採用程式碼 A 的實作，導航至 History
             navController.navigate(Screen.History.route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
         }) {
-            Icon(
-                painter = painterResource(R.drawable.img_5),
-                contentDescription = "Chat"
-            )
+            Icon(painter = painterResource(R.drawable.img_5), contentDescription = "Chat")
         }
 
-        // ==========================================
-        // 5. User 按鈕 (Screen.User)
-        // ==========================================
+        // 5. User
         IconButton(onClick = {
-            // 採用程式碼 A 的實作，導航至 User
             navController.navigate(Screen.User.route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
         }) {
-            Icon(
-                painter = painterResource(R.drawable.img_6),
-                contentDescription = "User"
-            )
+            Icon(painter = painterResource(R.drawable.img_6), contentDescription = "User")
         }
     }
 }

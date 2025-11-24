@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -35,14 +36,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow // 【修正1】新增 shadow 的 import
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
@@ -53,18 +53,17 @@ import com.example.c2cfastpay_card.UIScreen.components.ProductRepository
 import com.example.c2cfastpay_card.navigation.Screen
 import com.google.gson.Gson
 
-// --- 定義主題色 (藍綠色系) ---
-val SalePrimary = Color(0xFF487F81)      // 主色：藍綠色
-val SaleLight = Color(0xFFE0F2F1)        // 淺色背景
-val SaleText = Color(0xFF191C1C)         // 深色文字
-val SaleBackground = Color(0xFFF4F7F7)   // 頁面背景灰
+// 沿用主題色
+val SalePrimary = Color(0xFF487F81)
+val SaleLight = Color(0xFFE0F2F1)
+val SaleText = Color(0xFF191C1C)
+val SaleBackground = Color(0xFFF4F7F7)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddProductScreen(navController: NavController, draftJson: String? = null) {
     val context = LocalContext.current
 
-    // 初始化 ViewModel
     val productRepository = remember { ProductRepository(context) }
     val viewModel: AddProductViewModel = viewModel(
         factory = AddProductViewModelFactory(productRepository)
@@ -72,8 +71,9 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
 
     val scrollState = rememberScrollState()
 
-    // --- 狀態變數 ---
     var photoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var cameraUris by remember { mutableStateOf<Set<Uri>>(emptySet()) }
+
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
     var story by remember { mutableStateOf("") }
@@ -87,7 +87,6 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
     val logisticOptions = listOf("7-11", "全家", "面交")
     var selectedLogistics by remember { mutableStateOf(setOf<String>()) }
 
-    // 監聽 ViewModel 狀態
     LaunchedEffect(viewModel.uploadStatus) {
         viewModel.uploadStatus?.let { msg ->
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
@@ -95,20 +94,32 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
         }
     }
 
-    // 自動帶入資料邏輯
+    // 自動帶入資料 (解析 JSON)
     LaunchedEffect(draftJson) {
         if (!draftJson.isNullOrEmpty() && draftJson != "null") {
             try {
-                // 這裡使用了下方的 WishDataDTO
                 val wishData = Gson().fromJson(draftJson, WishDataDTO::class.java)
                 if (wishData.title.isNotEmpty()) title = wishData.title
                 if (wishData.description.isNotEmpty()) content = wishData.description
+
+                // 帶入故事欄位
+                if (wishData.story.isNotEmpty()) story = wishData.story
+
                 if (wishData.price.isNotEmpty()) price = wishData.price
                 if (wishData.qty.isNotEmpty()) stock = wishData.qty
-                if (wishData.imageUri.isNotEmpty()) {
-                    val uri = wishData.imageUri.toUri()
-                    if (!photoUris.contains(uri)) photoUris = photoUris + uri
+
+                // 1. 復原照片列表
+                val newUris = mutableListOf<Uri>()
+                if (wishData.imageUri.isNotEmpty()) newUris.add(wishData.imageUri.toUri())
+                if (wishData.images.isNotEmpty()) newUris.addAll(wishData.images.map { it.toUri() })
+                if (newUris.isNotEmpty()) photoUris = (photoUris + newUris).distinct()
+
+                // 2. 復原「相機實拍」標記
+                if (wishData.cameraImages.isNotEmpty()) {
+                    val camUris = wishData.cameraImages.map { it.toUri() }
+                    cameraUris = (cameraUris + camUris).toSet()
                 }
+
                 selectedStatus = if (wishData.condition == "全新") "全新" else "二手"
                 if (wishData.payment.isNotEmpty()) {
                     val newLogistics = mutableSetOf<String>()
@@ -130,33 +141,22 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
     }
 
     Scaffold(
-        containerColor = SaleBackground, // 設定背景色
+        containerColor = SaleBackground,
         topBar = {
             CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        "上架商品",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = SaleText
-                        )
-                    )
-                },
+                title = { Text("上架商品", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = SaleText)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = SaleText)
                     }
                 },
                 actions = {
-                    // 許願按鈕 (維持橘色以做區分)
                     Button(
                         onClick = { navController.navigate(Screen.AddWish.route) },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
                         shape = RoundedCornerShape(50),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-                        modifier = Modifier
-                            .padding(end = 12.dp)
-                            .height(36.dp)
+                        modifier = Modifier.padding(end = 12.dp).height(36.dp)
                     ) {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -169,14 +169,10 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .verticalScroll(scrollState)
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxSize().padding(innerPadding).verticalScroll(scrollState).padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // --- 1. 圖片上傳區 ---
+                // --- 圖片上傳區 ---
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     shape = RoundedCornerShape(16.dp),
@@ -185,10 +181,7 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier
-                                .width(4.dp)
-                                .height(16.dp)
-                                .background(SalePrimary, CircleShape))
+                            Box(modifier = Modifier.width(4.dp).height(16.dp).background(SalePrimary, CircleShape))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("商品圖片", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = SaleText)
                             Text(" (第一張將成為封面)", fontSize = 12.sp, color = Color.Gray)
@@ -199,42 +192,37 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 已選圖片
                             items(photoUris) { uri ->
                                 Box(modifier = Modifier.size(100.dp)) {
                                     Image(
                                         painter = rememberAsyncImagePainter(uri),
                                         contentDescription = null,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .border(1.dp, Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).border(1.dp, Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
                                         contentScale = ContentScale.Crop
                                     )
-                                    // 刪除按鈕
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Remove",
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(4.dp)
-                                            .size(20.dp)
-                                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
-                                            .padding(2.dp)
-                                            .clickable { photoUris = photoUris - uri },
-                                        tint = Color.White
-                                    )
+
+                                    val isCameraPhoto = cameraUris.contains(uri)
+
+                                    if (isCameraPhoto) {
+                                        Icon(
+                                            imageVector = Icons.Default.CameraAlt,
+                                            contentDescription = "Verified Photo",
+                                            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(24.dp).background(SalePrimary.copy(alpha = 0.9f), CircleShape).padding(4.dp),
+                                            tint = Color.White
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Remove",
+                                            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(20.dp).background(Color.Black.copy(alpha = 0.6f), CircleShape).padding(2.dp).clickable { photoUris = photoUris - uri },
+                                            tint = Color.White
+                                        )
+                                    }
                                 }
                             }
-                            // 新增按鈕 (虛線風格)
                             item {
                                 Box(
-                                    modifier = Modifier
-                                        .size(100.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(SaleLight.copy(alpha = 0.3f))
-                                        .border(2.dp, SalePrimary.copy(alpha = 0.3f), RoundedCornerShape(12.dp)) // 模擬虛線
-                                        .clickable { galleryLauncher.launch("image/*") },
+                                    modifier = Modifier.size(100.dp).clip(RoundedCornerShape(12.dp)).background(SaleLight.copy(alpha = 0.3f)).border(2.dp, SalePrimary.copy(alpha = 0.3f), RoundedCornerShape(12.dp)).clickable { galleryLauncher.launch("image/*") },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -250,7 +238,7 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // --- 2. 商品資訊表單 ---
+                // --- 商品資訊表單 ---
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     shape = RoundedCornerShape(16.dp),
@@ -261,9 +249,8 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp) // 統一間距
+                        verticalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
-                        // 標題 (有 Icon)
                         BeautifulTextField(
                             value = title,
                             onValueChange = { title = it },
@@ -272,13 +259,11 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                             placeholder = "例如：全新 switch 遊戲片"
                         )
 
-                        // 價格與庫存 (並排)
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             BeautifulTextField(
                                 value = price,
                                 onValueChange = { if (it.all { c -> c.isDigit() }) price = it },
                                 label = "價格",
-                                icon = Icons.Default.AttachMoney,
                                 keyboardType = KeyboardType.Number,
                                 modifier = Modifier.weight(1f)
                             )
@@ -286,13 +271,11 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                                 value = stock,
                                 onValueChange = { if (it.all { c -> c.isDigit() }) stock = it },
                                 label = "庫存",
-                                icon = Icons.Default.Inventory2,
                                 keyboardType = KeyboardType.Number,
                                 modifier = Modifier.weight(1f)
                             )
                         }
 
-                        // 新舊狀態 (下拉選單)
                         ExposedDropdownMenuBox(
                             expanded = statusExpanded,
                             onExpandedChange = { statusExpanded = !statusExpanded },
@@ -333,7 +316,6 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                             }
                         }
 
-                        // 物流方式 (Chips)
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.LocalShipping, contentDescription = null, tint = SalePrimary, modifier = Modifier.size(20.dp))
@@ -375,18 +357,16 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                             }
                         }
 
-                        // 商品文案 (多行，強制填滿寬度)
                         BeautifulTextField(
                             value = content,
                             onValueChange = { content = it },
                             label = "商品文案",
                             singleLine = false,
-                            minLines = 4, // 預設高度
+                            minLines = 4,
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = "詳細描述您的商品"
+                            placeholder = "詳細描述您的商品..."
                         )
 
-                        // 商品故事 (多行，強制填滿寬度)
                         BeautifulTextField(
                             value = story,
                             onValueChange = { story = it },
@@ -394,14 +374,13 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                             singleLine = false,
                             minLines = 3,
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = "分享這個商品背後的故事"
+                            placeholder = "分享這個商品背後的小故事..."
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // --- 3. 確認按鈕 ---
                 Button(
                     onClick = {
                         if (title.isBlank() || content.isBlank() || price.isBlank() || selectedLogistics.isEmpty()) {
@@ -417,18 +396,17 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                             condition = selectedStatus,
                             logistics = selectedLogistics,
                             photoUris = photoUris,
-                            onSuccess = { navController.popBackStack() }
+                            onSuccess = {
+                                // ★★★ 修正：上架成功後，跳轉到 Sale 頁面並清空返回堆疊 ★★★
+                                navController.navigate(Screen.Sale.route) {
+                                    popUpTo(Screen.Sale.route) { inclusive = true }
+                                }
+                            }
                         )
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .shadow(8.dp, RoundedCornerShape(16.dp)), // 增加陰影
+                    modifier = Modifier.fillMaxWidth().height(56.dp).shadow(8.dp, RoundedCornerShape(16.dp)),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = SalePrimary,
-                        disabledContainerColor = Color.Gray
-                    ),
+                    colors = ButtonDefaults.buttonColors(containerColor = SalePrimary, disabledContainerColor = Color.Gray),
                     enabled = !viewModel.isLoading
                 ) {
                     if (viewModel.isLoading) {
@@ -442,13 +420,9 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                 Spacer(modifier = Modifier.height(50.dp))
             }
 
-            // 全螢幕 Loading 遮罩
             if (viewModel.isLoading) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f))
-                        .clickable(enabled = false) {},
+                    modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)).clickable(enabled = false) {},
                     contentAlignment = Alignment.Center
                 ) {
                     Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
@@ -464,14 +438,13 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
     }
 }
 
-// --- 美化版通用輸入框 ---
 @Composable
 fun BeautifulTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
     icon: ImageVector? = null,
-    modifier: Modifier = Modifier.fillMaxWidth(), // 預設填滿寬度
+    modifier: Modifier = Modifier.fillMaxWidth(),
     singleLine: Boolean = true,
     minLines: Int = 1,
     keyboardType: KeyboardType = KeyboardType.Text,
@@ -480,19 +453,12 @@ fun BeautifulTextField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = {
-            Text(
-                text = label,
-                fontSize = 13.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
+        label = { Text(label) },
         placeholder = { Text(placeholder, color = Color.LightGray) },
         leadingIcon = if (icon != null) {
             { Icon(icon, contentDescription = null, tint = SalePrimary) }
         } else null,
-        modifier = modifier, // 使用傳入的 modifier
+        modifier = modifier,
         singleLine = singleLine,
         minLines = minLines,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
@@ -500,7 +466,7 @@ fun BeautifulTextField(
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = Color.White,
             unfocusedContainerColor = Color.White,
-            focusedBorderColor = SalePrimary, // 聚焦時使用主題色
+            focusedBorderColor = SalePrimary,
             unfocusedBorderColor = Color.LightGray,
             focusedLabelColor = SalePrimary,
             focusedTextColor = Color.Black,
@@ -509,13 +475,15 @@ fun BeautifulTextField(
     )
 }
 
-// --- 【修正2】補回漏掉的 WishDataDTO ---
 data class WishDataDTO(
     val title: String = "",
-    val price: String = "",       // 預算 -> 變價格
-    val description: String = "", // 描述 -> 變文案
-    val qty: String = "",         // 數量 -> 變庫存
-    val payment: String = "",     // 物流字串
+    val price: String = "",
+    val description: String = "",
+    val story: String = "",
+    val qty: String = "",
+    val payment: String = "",
     val imageUri: String = "",
+    val images: List<String> = emptyList(),
+    val cameraImages: List<String> = emptyList(),
     val condition: String = ""
 )

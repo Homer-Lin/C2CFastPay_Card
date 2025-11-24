@@ -1,6 +1,5 @@
 package com.example.c2cfastpay_card.UIScreen.Screens
 
-// --- 1. Import 區塊 (全部放在檔案最開頭) ---
 import android.net.Uri
 import android.util.Log
 import java.net.URLEncoder
@@ -8,7 +7,6 @@ import java.net.URLEncoder
 // Android & Compose 基礎
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-// 這裡引入 FlowRow 和 ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,19 +26,16 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 
-// 專案內的類別 (請確保這些路徑與您的專案一致)
-import com.example.c2cfastpay_card.ProductFlowViewModel
-import com.example.c2cfastpay_card.model.DraftProduct
-import com.google.gson.Gson
-import kotlinx.coroutines.launch
-
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 
-// 假設您的 API 相關類別 (若報紅字，請手動 Import 您專案中對應的檔案)
-// import com.example.c2cfastpay_card.api.C2CFastPayApi
-// import com.example.c2cfastpay_card.api.RetrofitClient
-// import com.example.c2cfastpay_card.api.QueryRequest ... 等等
+// 專案內的類別
+// ★★★ 修正重點 1：不需要 import com.example.c2cfastpay_card.ProductFlowViewModel ★★★
+// 因為現在這個檔案跟 ViewModel 都在同一個 package (UIScreen.Screens)，它會自動抓到正確的
+
+import com.example.c2cfastpay_card.model.DraftProduct
+import com.google.gson.Gson
+import kotlinx.coroutines.launch
 
 // --- ViewModel ---
 class AIChatViewModel(
@@ -259,22 +254,28 @@ class AIChatViewModel(
 
 // --- Composable UI ---
 
-// ★ 修正：@OptIn 放在函數上方
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AIChatScreen(
     navController: NavController,
-    flowViewModel: ProductFlowViewModel
+    flowViewModel: ProductFlowViewModel,
+    imageUri: String? = null // ★★★ 修正重點 2：補上這個參數，解決 "Cannot find a parameter" ★★★
 ) {
     // 建立 ViewModel (使用 Factory 注入 API)
     val viewModel: AIChatViewModel = viewModel(factory = AIChatViewModelFactory(RetrofitClient.apiService))
 
-    // 取得 Shared ViewModel 的圖片
-    val sharedPhotos = flowViewModel.photoUris.value
-    LaunchedEffect(Unit) {
-        if (sharedPhotos.isNotEmpty()) {
-            viewModel.currentImageUri = sharedPhotos.first()
-            Log.d("AIChat", "已載入圖片: ${viewModel.currentImageUri}")
+    // 處理傳入的圖片
+    LaunchedEffect(imageUri) {
+        if (imageUri != null) {
+            val uri = Uri.parse(imageUri)
+            viewModel.currentImageUri = uri
+            Log.d("AIChat", "已載入圖片: $uri")
+        } else {
+            // 如果沒傳入，試試看從 SharedViewModel 拿 (備用)
+            val sharedPhotos = flowViewModel.photoUris.value
+            if (sharedPhotos.isNotEmpty()) {
+                viewModel.currentImageUri = sharedPhotos.last()
+            }
         }
     }
 
@@ -295,14 +296,6 @@ fun AIChatScreen(
             flowViewModel.aiDescription.value = viewModel.aiDescription
         }
     }
-    // 如果 ProductFlowViewModel 沒有 story 變數，請註解掉下方這段
-    /*
-    LaunchedEffect(viewModel.finalStory) {
-        if (viewModel.step == 8 && viewModel.finalStory.isNotBlank()) {
-            flowViewModel.story.value = viewModel.finalStory
-        }
-    }
-    */
 
     Column(
         modifier = Modifier
@@ -310,13 +303,12 @@ fun AIChatScreen(
             .padding(16.dp)
             .background(Color.White)
     ) {
-        // --- 【新增】頂部標題與返回按鈕 ---
+        // --- 頂部標題與返回按鈕 ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp) // 讓標題跟聊天區有點距離
+                .padding(bottom = 16.dp)
         ) {
-            // 左上角返回按鈕
             IconButton(
                 onClick = { navController.popBackStack() },
                 modifier = Modifier.align(Alignment.CenterStart)
@@ -327,13 +319,13 @@ fun AIChatScreen(
                 )
             }
 
-            // 中間標題
             Text(
                 text = "AI 上架助手",
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.align(Alignment.Center)
             )
         }
+
         // --- 聊天顯示區 ---
         LazyColumn(
             modifier = Modifier.weight(1f),
@@ -382,7 +374,7 @@ fun AIChatScreen(
                 }
             }
 
-            2 -> { // 選擇屬性 (FlowRow)
+            2 -> { // 選擇屬性
                 Text("請選擇屬性（至少三個）", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
 
