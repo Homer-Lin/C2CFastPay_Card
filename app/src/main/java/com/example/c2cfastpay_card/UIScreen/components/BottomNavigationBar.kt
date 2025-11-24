@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.c2cfastpay_card.R
 import com.example.c2cfastpay_card.navigation.Screen
+import androidx.navigation.NavGraph.Companion.findStartDestination
 
 @Composable
 fun BottomNavigationBar(navController: NavController) {
@@ -29,7 +30,7 @@ fun BottomNavigationBar(navController: NavController) {
     ) {
         // Home 按鈕
         IconButton(onClick = { navController.navigate(Screen.Sale.route) {
-            popUpTo(navController.graph.startDestinationId) { saveState = true }
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
             launchSingleTop = true
             restoreState = true
         }}) {
@@ -39,12 +40,10 @@ fun BottomNavigationBar(navController: NavController) {
             )
         }
 
-        // ==========================================
-        // ==========================================
+        // Add 按鈕
         IconButton(onClick = {
             // ★ 修改這裡：連到選擇頁面
             navController.navigate(Screen.WishOrProduct.route) {
-                // 這裡的 popUpTo 設定看你的需求，通常保持原本的即可
                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
@@ -70,8 +69,12 @@ fun BottomNavigationBar(navController: NavController) {
 
         // Chat 按鈕
         IconButton(onClick = {
-            // 如果您的 Screen.kt 有定義 Chat，可以把 TODO 改掉
-            // navController.navigate(Screen.Chat.route)
+            // 【修改】導航到「聊天列表 (History)」
+            navController.navigate(Screen.History.route) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
         }) {
             Icon(
                 painter = painterResource(R.drawable.img_5),
@@ -81,7 +84,12 @@ fun BottomNavigationBar(navController: NavController) {
 
         // User 按鈕
         IconButton(onClick = {
-            // navController.navigate(Screen.User.route)
+            // 【修改】導航到「會員中心 (User)」
+            navController.navigate(Screen.User.route) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
         }) {
             Icon(
                 painter = painterResource(R.drawable.img_6),

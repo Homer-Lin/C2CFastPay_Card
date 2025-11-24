@@ -146,4 +146,24 @@ class ProductRepository(private val context: Context) { // Context 雖然這裡�
             null
         }
     }
+    suspend fun getMyProducts(): List<ProductItem> {
+        val userId = getCurrentUserId() ?: return emptyList()
+
+        // 這裡可能需要複合索引 (ownerId + timestamp)
+        // 如果 Logcat 報錯，請依照連結建立索引
+        val snapshot = db.collection("products")
+            .whereEqualTo("ownerId", userId)
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .get()
+            .await()
+
+        return snapshot.toObjects(ProductItem::class.java)
+    }
+    suspend fun deleteProduct(productId: String) {
+        db.collection("products")
+            .document(productId)
+            .delete()
+            .await()
+        // 選擇性：如果有上傳圖片，這裡也應該去 Storage 刪除圖片
+    }
 }

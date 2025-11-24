@@ -30,9 +30,11 @@ import com.example.c2cfastpay_card.UIScreen.Screens.ChatScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.ForgotPasswordScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.HistoryScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.LoginScreen
+import com.example.c2cfastpay_card.UIScreen.Screens.MyProductsScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.ProductDetailScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.RegisterScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.SaleProductPage
+import com.example.c2cfastpay_card.UIScreen.Screens.UserScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.WishPreviewPage
 import com.example.c2cfastpay_card.UIScreen.components.WishRepository
 import com.google.gson.Gson
@@ -53,6 +55,7 @@ fun AppNavigationGraph(
     NavHost(
         navController = navController,
         startDestination = Screen.Login.route // 設定 App 啟動時的第一個畫面
+
     ) {
 
         // --- 登入/註冊流程 ---
@@ -240,6 +243,12 @@ fun AppNavigationGraph(
                 navController = navController,
                 matchId = matchId
             )
+        }
+        composable(route = Screen.User.route) {
+            UserScreen(navController = navController)
+        }
+        composable(route = Screen.MyProducts.route) {
+            MyProductsScreen(navController = navController)
         }
     }
 }
