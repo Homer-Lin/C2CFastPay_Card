@@ -9,6 +9,17 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
+// 1. 新增滑動方向列舉
+enum class SwipeDirection { LEFT, RIGHT }
+
+// 2. 新增滑動紀錄資料模型
+data class SwipeRecord(
+    val userId: String = "",
+    val productId: String = "",
+    val direction: String = "", // "LEFT" or "RIGHT"
+    val timestamp: Long = System.currentTimeMillis()
+)
+
 class MatchRepository(private val context: Context) {
 
     private val db = FirebaseFirestore.getInstance()
@@ -19,69 +30,98 @@ class MatchRepository(private val context: Context) {
     }
 
     /**
+     * ★ 新增：記錄滑動 (不論左滑右滑都記)
+     * 用來防止卡片重複出現
+     */
+    suspend fun recordSwipe(productId: String, direction: SwipeDirection) {
+        val myId = getCurrentUserId() ?: return
+
+        val swipeData = SwipeRecord(
+            userId = myId,
+            productId = productId,
+            direction = direction.name
+        )
+
+        // 使用 "userId_productId" 當作 ID，確保每個商品只會被記錄一次
+        val docId = "${myId}_${productId}"
+
+        try {
+            db.collection("swipes").document(docId).set(swipeData).await()
+            Log.d("MatchRepository", "已記錄滑動: $productId -> $direction")
+        } catch (e: Exception) {
+            Log.e("MatchRepository", "記錄滑動失敗", e)
+        }
+    }
+
+    /**
+     * ★ 新增：取得「我已經滑過」的所有商品 ID 列表
+     */
+    suspend fun getSwipedProductIds(): List<String> {
+        val myId = getCurrentUserId() ?: return emptyList()
+
+        return try {
+            val snapshot = db.collection("swipes")
+                .whereEqualTo("userId", myId)
+                .get()
+                .await()
+
+            // 取出所有 productId
+            snapshot.documents.mapNotNull { it.getString("productId") }
+        } catch (e: Exception) {
+            Log.e("MatchRepository", "取得已滑過列表失敗", e)
+            emptyList()
+        }
+    }
+
+    /**
      * 右滑喜歡 (Like) - 核心功能
-     * 回傳 true 代表配對成功
      */
     suspend fun likeProduct(targetProduct: ProductItem): Boolean {
         val myId = getCurrentUserId()
-        if (myId == null) {
-            Log.e("MatchDebug", "錯誤：找不到目前使用者 ID (myId is null)")
-            return false
-        }
+        if (myId == null) return false
 
-        // 檢查對方 ID 是否正常
-        if (targetProduct.ownerId.isBlank()) {
-            Log.e("MatchDebug", "錯誤：對方的商品 ownerId 是空的！無法配對。商品 ID: ${targetProduct.id}")
-            return false
-        }
+        if (targetProduct.ownerId.isBlank()) return false
 
-        Log.d("MatchDebug", "開始執行 Like: 我 ($myId) -> 喜歡 -> 他 (${targetProduct.ownerId}) 的商品 (${targetProduct.title})")
+        Log.d("MatchDebug", "開始執行 Like: 我 ($myId) -> 喜歡 -> 他 (${targetProduct.ownerId})")
 
         try {
-            // 1. 取得我的名字 (為了寫入 Like 資料)
+            // 1. 取得我的名字
             val mySnapshot = db.collection("users").document(myId).get().await()
             val me = mySnapshot.toObject(User::class.java)
             val myName = me?.name ?: "未知用戶"
 
             // 2. 寫入 Like 資料
             val like = Like(
-                id = "${myId}_${targetProduct.id}", // 確保唯一性
+                id = "${myId}_${targetProduct.id}",
                 likerId = myId,
                 likerName = myName,
                 productId = targetProduct.id,
                 productOwnerId = targetProduct.ownerId
             )
 
-            db.collection("likes")
-                .document(like.id)
-                .set(like)
-                .await()
-            Log.d("MatchDebug", "Like 資料寫入成功")
+            db.collection("likes").document(like.id).set(like).await()
+
+            // ★ 順便記錄 Swipe (雖然 ViewModel 會呼叫，但這裡雙重確保也好)
+            recordSwipe(targetProduct.id, SwipeDirection.RIGHT)
 
             // 3. 檢查配對 (Mutual Like)
-            Log.d("MatchDebug", "開始檢查對方是否喜歡過我...")
-
             val mutualLikeSnapshot = db.collection("likes")
-                .whereEqualTo("likerId", targetProduct.ownerId) // 對方是按讚者
-                .whereEqualTo("productOwnerId", myId)     // 我是商品主人
+                .whereEqualTo("likerId", targetProduct.ownerId)
+                .whereEqualTo("productOwnerId", myId)
                 .limit(1)
                 .get()
                 .await()
 
             if (!mutualLikeSnapshot.isEmpty) {
-                Log.d("MatchDebug", "找到配對了！對方也喜歡我！準備建立聊天室...")
+                Log.d("MatchDebug", "配對成功！")
 
-                // A. 找出對方喜歡我的哪個商品
                 val theirLikeDoc = mutualLikeSnapshot.documents.first()
                 val myProductIdTheyLiked = theirLikeDoc.getString("productId")
-                Log.d("MatchDebug", "對方喜歡我的商品 ID: $myProductIdTheyLiked")
 
                 if (myProductIdTheyLiked != null) {
                     val myProductDoc = db.collection("products").document(myProductIdTheyLiked).get().await()
 
                     if (myProductDoc.exists()) {
-
-                        // --- 安全讀取價格 (避免崩潰) ---
                         val originPrice = myProductDoc.get("price")
                         val safePrice = when (originPrice) {
                             is Number -> originPrice.toDouble()
@@ -89,7 +129,6 @@ class MatchRepository(private val context: Context) {
                             else -> 0.0
                         }
 
-                        // B. 準備我的商品資料快照
                         val myProductData = hashMapOf<String, Any>(
                             "id" to myProductDoc.id,
                             "title" to (myProductDoc.getString("title") ?: "我的商品"),
@@ -98,7 +137,6 @@ class MatchRepository(private val context: Context) {
                             "price" to safePrice
                         )
 
-                        // C. 準備對方的商品資料快照
                         val targetProductPrice = targetProduct.price.toDoubleOrNull() ?: 0.0
                         val targetProductData = hashMapOf<String, Any>(
                             "id" to targetProduct.id,
@@ -108,30 +146,19 @@ class MatchRepository(private val context: Context) {
                             "price" to targetProductPrice
                         )
 
-                        // D. 建立詳細配對紀錄
                         createMatchWithDetails(myId, targetProduct.ownerId, myProductData, targetProductData)
                         return true
-                    } else {
-                        Log.e("MatchDebug", "錯誤：雖然配對成功，但在資料庫找不到『我被喜歡的商品』(ID: $myProductIdTheyLiked)")
                     }
                 }
-            } else {
-                Log.d("MatchDebug", "目前尚未配對 (對方還沒按喜歡，或查詢不到)")
             }
 
         } catch (e: Exception) {
-            Log.e("MatchDebug", "發生錯誤: ${e.message}", e)
-            if (e.message?.contains("index") == true) {
-                Log.e("MatchDebug", "請去 Logcat 點擊 Firebase 連結建立索引！")
-            }
+            Log.e("MatchDebug", "Like 失敗: ${e.message}", e)
         }
 
         return false
     }
 
-    /**
-     * 建立詳細配對紀錄
-     */
     private suspend fun createMatchWithDetails(
         myId: String,
         otherId: String,
@@ -150,20 +177,12 @@ class MatchRepository(private val context: Context) {
             "product2" to product2Map
         )
 
-        db.collection("matches")
-            .document(matchId)
-            .set(matchData)
-            .await()
-
-        Log.d("MatchDebug", "聊天室建立完成！Match ID: $matchId")
+        db.collection("matches").document(matchId).set(matchData).await()
     }
 
-    /**
-     * 讀取配對列表
-     */
+    // 保留原本的 getMatches
     suspend fun getMatches(): List<MatchItem> {
         val myId = getCurrentUserId() ?: return emptyList()
-
         try {
             val snapshot = db.collection("matches")
                 .whereArrayContains("users", myId)
@@ -172,10 +191,8 @@ class MatchRepository(private val context: Context) {
 
             return snapshot.documents.mapNotNull { doc ->
                 val data = doc.data ?: return@mapNotNull null
-
                 val p1 = data["product1"] as? Map<String, Any>
                 val p2 = data["product2"] as? Map<String, Any>
-
                 if (p1 == null || p2 == null) return@mapNotNull null
 
                 val p1OwnerId = p1["ownerId"] as? String
@@ -190,7 +207,6 @@ class MatchRepository(private val context: Context) {
                 )
             }
         } catch (e: Exception) {
-            Log.e("MatchDebug", "讀取配對列表失敗", e)
             return emptyList()
         }
     }

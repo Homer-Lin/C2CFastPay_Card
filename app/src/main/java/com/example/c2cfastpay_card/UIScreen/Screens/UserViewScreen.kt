@@ -8,6 +8,7 @@ import com.example.c2cfastpay_card.data.User
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import com.google.firebase.Firebase
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.storage.storage
 import kotlinx.coroutines.flow.MutableSharedFlow // 新增
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +46,24 @@ class UserViewModel : ViewModel() {
                 _user.value = snapshot.toObject(User::class.java)
             } catch (e: Exception) {
                 Log.e("UserViewModel", "讀取失敗", e)
+            }
+        }
+    }
+    fun addPoints(amount: Int) {
+        viewModelScope.launch {
+            try {
+                val userId = auth.currentUser?.uid ?: return@launch
+
+                // 使用原子操作增加數值
+                db.collection("users").document(userId)
+                    .update("points", FieldValue.increment(amount.toLong()))
+                    .await()
+                fetchUserData()
+                _toastMessage.emit("儲值成功！增加 $amount 點")
+
+            } catch (e: Exception) {
+                Log.e("UserViewModel", "儲值失敗", e)
+                _toastMessage.emit("儲值失敗: ${e.message}")
             }
         }
     }
@@ -125,6 +144,7 @@ class UserViewModel : ViewModel() {
                 }
         }
     }
+
 
     fun logout(onSuccess: () -> Unit) {
         auth.signOut()

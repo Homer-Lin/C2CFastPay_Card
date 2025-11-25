@@ -117,22 +117,22 @@ class ProductRepository(private val context: Context) {
         }
     }
 
-    suspend fun getProductsForMatching(): List<ProductItem> {
+    suspend fun getProductsForMatching(swipedIds: List<String>): List<ProductItem> {
         val userId = getCurrentUserId()
         return try {
-            // 從 Firestore 抓取所有商品
             val snapshot = db.collection("products")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .get().await()
 
             val allProducts = snapshot.toObjects(ProductItem::class.java)
 
-            // 過濾邏輯：如果有登入，就排除掉「ownerId」是自己的商品
-            // 這樣才不會配對到自己賣的東西
-            if (userId != null) {
-                allProducts.filter { it.ownerId != userId }
-            } else {
-                allProducts
+            allProducts.filter { product ->
+                // 1. 排除自己的商品
+                val isNotMine = userId == null || product.ownerId != userId
+                // 2. 排除已經滑過的商品
+                val isNotSwiped = !swipedIds.contains(product.id)
+
+                isNotMine && isNotSwiped
             }
         } catch (e: Exception) {
             Log.e("ProductRepository", "讀取配對商品失敗", e)

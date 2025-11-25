@@ -47,13 +47,14 @@ import com.google.gson.Gson
 @Composable
 fun AppNavigationGraph(
     navController: NavHostController,
+    startDestination: String
 ) {
     // 建立共用的 ViewModel
     val productFlowViewModel: ProductFlowViewModel = viewModel()
 
     NavHost(
         navController = navController,
-        startDestination = Screen.Login.route
+        startDestination = startDestination
     ) {
 
         // --- 登入/註冊流程 ---
