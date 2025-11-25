@@ -16,7 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LockReset
-import androidx.compose.material.icons.filled.Person // 【新增】
+import androidx.compose.material.icons.filled.Notifications // 【正確引入 Notifications】
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,9 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter // 【新增】
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.rememberVectorPainter // 【新增】
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -47,7 +48,7 @@ fun UserScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val context = LocalContext.current
 
-    // 監聽 ViewModel 的 Toast 事件 (簡單實作)
+    // 監聽 ViewModel 的 Toast 事件
     LaunchedEffect(Unit) {
         viewModel.toastMessage.collect { message ->
             if (message.isNotBlank()) {
@@ -96,7 +97,7 @@ fun UserScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         // 大頭貼區塊
                         Box(modifier = Modifier.size(100.dp)) {
-                            // 【修改 1】預設頭像邏輯
+                            // 預設頭像邏輯
                             if (!user?.avatarUrl.isNullOrEmpty()) {
                                 Image(
                                     painter = rememberAsyncImagePainter(user!!.avatarUrl),
@@ -169,13 +170,24 @@ fun UserScreen(
                 // --- 選單列表 ---
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
 
-                    // 【修改 2】連接到「我的商品」
+                    // 連接到「我的商品」
                     MenuCard(
                         icon = Icons.Default.ShoppingBag,
                         title = "我的商品管理",
                         subtitle = "查看或下架您上架的商品",
                         onClick = {
                             navController.navigate(Screen.MyProducts.route)
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    MenuCard(
+                        icon = Icons.Default.Notifications, // 現在這裡不會報錯了
+                        title = "通知中心",
+                        subtitle = "查看配對成功與系統訊息",
+                        onClick = {
+                            Toast.makeText(context, "功能開發中", Toast.LENGTH_SHORT).show()
                         }
                     )
 

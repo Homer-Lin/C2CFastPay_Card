@@ -1,19 +1,30 @@
+// 請將此內容更新到 CardStack.kt
 package com.example.c2cfastpay_card.UIScreen.Screens
 
 import android.util.Log
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio // 1. 確保 import
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
@@ -23,26 +34,23 @@ import androidx.navigation.NavController
 import com.example.c2cfastpay_card.R
 import com.example.c2cfastpay_card.UIScreen.components.ProductItem
 import com.example.c2cfastpay_card.UIScreen.components.ProductRepository
-import com.example.c2cfastpay_card.UIScreen.components.MatchRepository // 2. 確保 import
+import com.example.c2cfastpay_card.UIScreen.components.MatchRepository
 import com.example.c2cfastpay_card.navigation.Screen
 import com.spartapps.swipeablecards.state.rememberSwipeableCardsState
 import com.spartapps.swipeablecards.ui.lazy.LazySwipeableCards
 import com.spartapps.swipeablecards.ui.lazy.items
-import com.example.c2cfastpay_card.UIScreen.components.CardItem
-// 3. 修正 Import：使用您提供的正確路徑
 import com.spartapps.swipeablecards.ui.SwipeableCardDirection
-
+import com.example.c2cfastpay_card.UIScreen.components.CardItem // 如果您有獨立檔案，保留這個，否則使用下方定義
+import kotlinx.coroutines.launch
+import kotlin.math.absoluteValue
+import coil.compose.AsyncImage
 
 @Composable
-fun CardStackScreen( // 外層 Composable
-    navController: NavController
-) {
+fun CardStackScreen(navController: NavController) {
     val context = LocalContext.current
-    // 4. 建立兩個 Repositories
     val productRepository = remember { ProductRepository(context) }
     val matchRepository = remember { MatchRepository(context) }
 
-    // 5. 建立 ViewModel，傳入兩個 Repositories
     val viewModel: CardStackViewModel = viewModel(
         factory = CardStackViewModelFactory(productRepository, matchRepository)
     )
@@ -50,171 +58,287 @@ fun CardStackScreen( // 外層 Composable
     val cardsToShow by viewModel.cards.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
-    Log.d("CardStackDebug", "CardStackScreen recomposing. isLoading: $isLoading, cardsToShow: ${cardsToShow.size}")
-
     LaunchedEffect(Unit) {
-        Log.d("CardStackDebug", "LaunchedEffect triggered. Calling loadPotentialMatches()")
         viewModel.loadPotentialMatches()
     }
 
-    // 6. 呼叫 CardStackLayout，傳入 viewModel
     CardStackLayout(
         navController = navController,
         items = cardsToShow,
         isLoading = isLoading,
-        viewModel = viewModel // <-- 傳入 viewModel
+        viewModel = viewModel
     )
 }
 
-// 實際的佈局 Composable
 @Composable
 fun CardStackLayout(
     navController: NavController,
-    items: List<ProductItem>, // <-- 'items' 在這裡被定義
+    items: List<ProductItem>,
     isLoading: Boolean,
-    viewModel: CardStackViewModel, // <-- 接收 viewModel
+    viewModel: CardStackViewModel,
     modifier: Modifier = Modifier,
 ) {
-    ConstraintLayout(modifier = modifier.fillMaxSize()) {
-        val (
-            imageView29, imageButton37, textView32, imageButton38,
-            cardDeck,
-            textView33
-        ) = createRefs()
+    ConstraintLayout(modifier = modifier.fillMaxSize().background(Color(0xFFF5F5F5))) {
+        val (topBar, cardDeck, controlButtons, bottomNav) = createRefs()
 
-        // --- 頂部 UI (Banner + 按鈕 + 標題) (保持不變) ---
-        Image(
-            painter = painterResource(id = R.drawable.banner_in_choose_photo), //
-            contentDescription = "Banner",
-            modifier = Modifier.constrainAs(imageView29) {
-                top.linkTo(parent.top)
-                start.linkTo(parent.start)
-                end.linkTo(parent.end)
-                width = Dimension.fillToConstraints
-                height = Dimension.wrapContent
-            },
-            contentScale = ContentScale.FillWidth
-        )
-        IconButton(
-            onClick = { navController.popBackStack() },
-            modifier = Modifier.size(50.dp).constrainAs(imageButton37) {
-                start.linkTo(parent.start, margin = 8.dp)
-                top.linkTo(parent.top, margin = 34.dp)
-            }
+        // --- 1. 頂部 Bar (簡化版) ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 40.dp, start = 16.dp, end = 16.dp)
+                .constrainAs(topBar) { top.linkTo(parent.top) },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.a_1_back_buttom), //
-                contentDescription = "Back"
-            )
-        }
-        Text(
-            text = "商品名片配對",
-            color = Color(0xFF759E9F),
-            fontSize = 20.sp,
-            modifier = Modifier.constrainAs(textView32) {
-                start.linkTo(imageButton37.end, margin = 8.dp)
-                top.linkTo(parent.top, margin = 44.dp)
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(painterResource(R.drawable.a_1_back_buttom), contentDescription = "Back", modifier = Modifier.size(24.dp))
             }
-        )
-        IconButton(
-            onClick = { /* TODO: 幫助操作 */ },
-            modifier = Modifier.size(50.dp).constrainAs(imageButton38) {
-                end.linkTo(parent.end, margin = 8.dp)
-                top.linkTo(parent.top, margin = 36.dp)
+            Text("商品名片配對", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF487F81))
+            IconButton(onClick = { /* Help */ }) {
+                Icon(painterResource(R.drawable.b_13_help), contentDescription = "Help", modifier = Modifier.size(24.dp))
             }
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.b_13_help), //
-                modifier = Modifier.size(30.dp),
-                contentDescription = "Help",
-            )
         }
-        // --- 頂部 UI 結束 ---
 
+        // --- 2. 卡片區域 ---
         Box(
             modifier = Modifier
                 .constrainAs(cardDeck) {
-                    top.linkTo(imageView29.bottom, margin = 20.dp)
-                    bottom.linkTo(textView33.top, margin = 20.dp)
-                    start.linkTo(parent.start, margin = 32.dp)
-                    end.linkTo(parent.end, margin = 32.dp)
+                    top.linkTo(topBar.bottom, margin = 20.dp)
+                    bottom.linkTo(controlButtons.top, margin = 20.dp)
+                    start.linkTo(parent.start, margin = 16.dp)
+                    end.linkTo(parent.end, margin = 16.dp)
                     width = Dimension.fillToConstraints
-                    height = Dimension.wrapContent
-                }
-                .aspectRatio(0.75f), // 保持卡片長寬比
+                    height = Dimension.fillToConstraints // 讓卡片區盡量佔滿中間
+                },
             contentAlignment = Alignment.Center
         ) {
             if (isLoading) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = Color(0xFF487F81))
+            } else if (items.isEmpty()) {
+                Text("沒有更多商品了", color = Color.Gray, fontSize = 18.sp)
             } else {
-                if (items.isNotEmpty()) {
+                key(items.size) {
+                    val state = rememberSwipeableCardsState(itemCount = { items.size })
+                    val scope = rememberCoroutineScope()
 
-                    // --- 修改開始 ---
-                    // 1. 使用 key(items.size) 包住所有東西
-                    //    當 items.size 改變時 (例如 3 -> 2)，
-                    //    key() { ... } 區塊內的一切都將被強制「重置」。
-                    key(items.size) {
+                    // 將 state 傳遞給按鈕使用 (透過 Callback 或直接在同個 Scope)
 
-                        // 2. 將 items.size 作為「值」傳入
-                        //    而不是作為 lambda ({ items.size }) 傳入。
-                        //    這能確保新的 state 物件在建立時
-                        //    就 100% 知道正確的、最新的卡片數量。
-                        val state = rememberSwipeableCardsState(
-                            itemCount = { items.size } // <-- 這樣就 100% 正確了
-                        )
-                        // --- 修改結束 ---
-
-                        LazySwipeableCards(
-                            state = state,
-
-                        // --- 8. 這是 *真正* 正確的 onSwipe 邏輯 ---
-                        onSwipe = { swipedProduct, direction ->
-                            // 'swipedProduct' *就是* ProductItem 物件
-                            // 'direction' *就是* SwipeableCardDirection
-
-                            // 直接呼叫 viewModel
-                            when (direction) {
-                                SwipeableCardDirection.Left -> viewModel.swipeLeft(swipedProduct as ProductItem) // <-- 類型轉換
-                                SwipeableCardDirection.Right -> viewModel.swipeRight(swipedProduct as ProductItem) // <-- 類型轉換
-                                else -> viewModel.swipeLeft(swipedProduct as ProductItem) // 預設當作不喜歡
-                            }
-                        },
-                        // --- onSwipe 結束 ---
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // 9. 這裡的 items lambda 是用於 *顯示* 卡片
-                        items(items) { product, index, offset ->
-                            CardItem(
-                                product = product,
-                                offset = offset
-                            )
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .aspectRatio(0.75f) // 卡片比例
+                        ) {
+                            LazySwipeableCards(
+                                state = state,
+                                onSwipe = { swipedProduct, direction ->
+                                    val product = swipedProduct as ProductItem
+                                    if (direction == SwipeableCardDirection.Right) {
+                                        viewModel.swipeRight(product)
+                                    } else {
+                                        viewModel.swipeLeft(product)
+                                    }
+                                }
+                            ) {
+                                items(items) { product, index, offset ->
+                                    // 這裡呼叫增強版的 CardItem
+                                    EnhancedCardItem(
+                                        product = product,
+                                        offsetX = offset.x // 傳入 X 軸偏移量
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // --- 3. 底部控制按鈕 (放在卡片下方) ---
+                        // 讓使用者明確知道左邊是不喜歡，右邊是喜歡
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 40.dp)
+                        ) {
+                            // 叉叉按鈕 (Pass)
+                            FloatingActionButton(
+                                onClick = {
+                                    scope.launch { state.swipe(SwipeableCardDirection.Left) }
+                                },
+                                containerColor = Color.White,
+                                contentColor = Color(0xFFFF5252),
+                                shape = CircleShape,
+                                modifier = Modifier.size(64.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Pass", modifier = Modifier.size(32.dp))
+                            }
+
+                            // 愛心按鈕 (Like)
+                            FloatingActionButton(
+                                onClick = {
+                                    scope.launch { state.swipe(SwipeableCardDirection.Right) }
+                                },
+                                containerColor = Color.White,
+                                contentColor = Color(0xFF4CAF50), // 綠色愛心
+                                shape = CircleShape,
+                                modifier = Modifier.size(64.dp)
+                            ) {
+                                Icon(Icons.Default.Favorite, contentDescription = "Like", modifier = Modifier.size(32.dp))
                             }
                         }
                     }
-                } else {
-                    Text(
-                        text = "目前沒有任何上架的商品",
-                        fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                    )
                 }
-
-
             }
         }
 
-        // --- 底部按鈕 (保持不變) ---
+        // --- 4. 歷史紀錄連結 ---
         TextButton(
-            onClick = { navController.navigate(Screen.History.route) }, //
-            modifier = Modifier.constrainAs(textView33) {
-                start.linkTo(parent.start, margin = 16.dp)
-                bottom.linkTo(parent.bottom, margin = 36.dp)
+            onClick = { navController.navigate(Screen.History.route) },
+            modifier = Modifier.constrainAs(controlButtons) { // 借用 id 位置
+                bottom.linkTo(parent.bottom, margin = 20.dp)
+                start.linkTo(parent.start)
+                end.linkTo(parent.end)
             }
         ) {
-            Text(
-                text = "歷史紀錄",
-                color = Color(0xFF759E9F)
-            )
+            Text("查看配對紀錄", color = Color(0xFF487F81))
         }
-        // --- 底部按鈕結束 ---
     }
 }
+
+// --- 增強版卡片 Item (包含 Overlay 動畫) ---
+@Composable
+fun EnhancedCardItem(
+    product: ProductItem,
+    offsetX: Float // 接收滑動偏移量
+) {
+    Card(
+        modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(8.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // 背景圖片
+            AsyncImage( // 假設您有導入 Coil，如果沒有請用您原本的圖片載入方式
+                model = product.imageUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // 漸層遮罩 (讓文字清楚)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(androidx.compose.ui.graphics.Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(0.8f)),
+                        startY = 300f
+                    ))
+            )
+
+            // 商品資訊
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(20.dp)
+            ) {
+                Text(
+                    text = product.title,
+                    color = Color.White,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "$${product.price}",
+                    color = Color.Green,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = product.description,
+                    color = Color.White.copy(0.8f),
+                    fontSize = 14.sp,
+                    maxLines = 2
+                )
+            }
+
+            // --- 視覺回饋 Overlay ---
+            // 根據 offsetX 計算透明度
+            // 正數 (向右滑) -> 顯示 LIKE
+            // 負數 (向左滑) -> 顯示 NOPE
+
+            val likeAlpha = (offsetX / 300f).coerceIn(0f, 1f)
+            val nopeAlpha = (-offsetX / 300f).coerceIn(0f, 1f)
+
+            // LIKE (右滑顯示)
+            if (likeAlpha > 0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Green.copy(alpha = likeAlpha * 0.3f)), // 整個變綠
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(40.dp)
+                            .rotate(-20f)
+                            .border(4.dp, Color.Green, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        Text(
+                            text = "LIKE",
+                            color = Color.Green,
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier.alpha(likeAlpha)
+                        )
+                    }
+                    // 中心大愛心
+                    Icon(
+                        imageVector = Icons.Default.Favorite,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(100.dp).alpha(likeAlpha)
+                    )
+                }
+            }
+
+            // NOPE (左滑顯示)
+            if (nopeAlpha > 0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Red.copy(alpha = nopeAlpha * 0.3f)), // 整個變紅
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(40.dp)
+                            .rotate(20f)
+                            .border(4.dp, Color.Red, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        Text(
+                            text = "NOPE",
+                            color = Color.Red,
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier.alpha(nopeAlpha)
+                        )
+                    }
+                    // 中心大叉叉
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(100.dp).alpha(nopeAlpha)
+                    )
+                }
+            }
+        }
+    }
+}
+// 需要 Coil，請確保您的 imports 包含：
+// import coil.compose.AsyncImage
