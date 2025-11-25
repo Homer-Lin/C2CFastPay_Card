@@ -27,8 +27,7 @@ class ProductRepository(private val context: Context) {
     suspend fun addProduct(product: ProductItem, imageUris: List<Uri> = emptyList()) {
         val userId = getCurrentUserId() ?: throw Exception("尚未登入")
 
-        // 1. 取得使用者資料 (填寫 ownerName)
-        // 這裡加個 try-catch 避免如果找不到 user 資料導致上架崩潰
+        // 1. 取得使用者資料
         val userName = try {
             val userSnapshot = db.collection("users").document(userId).get().await()
             val user = userSnapshot.toObject(User::class.java)
@@ -36,33 +35,38 @@ class ProductRepository(private val context: Context) {
         } catch (e: Exception) {
             "未知賣家"
         }
-        // 為了簡化，Email 暫時不強制讀取，若 userSnapshot 失敗則留空
         val userEmail = auth.currentUser?.email ?: ""
 
-        // 2. 上傳圖片 (處理多張圖)
+        // 2. 準備要上傳的圖片清單
         val uploadedImageUrls = product.images.toMutableList()
 
-        // 相容：如果 imageUri 有值且不是網址 (是本地路徑)，也要上傳
+        // ★★★ 修正重點：先整理出要上傳的 Uri 列表，並去除重複 ★★★
+        val urisToUpload = imageUris.distinct().toMutableList()
+
+        // 檢查主圖 (product.imageUri) 是否需要加入上傳列表
+        // 如果它不是網址(是本地路徑)，且不在 imageUris 列表中，才需要加進去
         if (product.imageUri.isNotEmpty()
             && !product.imageUri.startsWith("http")
             && !product.imageUri.startsWith("https")) {
 
-            val url = uploadImageToStorage(Uri.parse(product.imageUri))
-            if (url.isNotEmpty()) {
-                uploadedImageUrls.add(0, url) // 加在第一張
+            val mainUri = Uri.parse(product.imageUri)
+            if (!urisToUpload.contains(mainUri)) {
+                urisToUpload.add(0, mainUri) // 加在最前面
             }
         }
 
-        // 處理新傳入的 List<Uri>
-        for (uri in imageUris) {
+        // 3. 執行上傳 (只對整理好的列表跑迴圈)
+        for (uri in urisToUpload) {
             val url = uploadImageToStorage(uri)
-            if (url.isNotEmpty()) uploadedImageUrls.add(url)
+            if (url.isNotEmpty()) {
+                uploadedImageUrls.add(url)
+            }
         }
 
-        // 確保 imageUri (首圖) 有值，給列表頁顯示用
+        // 4. 設定最終的主圖網址 (取上傳後的第一張)
         val finalMainImage = if (uploadedImageUrls.isNotEmpty()) uploadedImageUrls[0] else ""
 
-        // 3. 準備寫入資料
+        // 5. 準備寫入資料
         val newProduct = product.copy(
             imageUri = finalMainImage, // 更新首圖為網址
             images = uploadedImageUrls,
@@ -72,7 +76,7 @@ class ProductRepository(private val context: Context) {
             timestamp = System.currentTimeMillis()
         )
 
-        // 4. 寫入 Firestore
+        // 6. 寫入 Firestore
         db.collection("products")
             .document(newProduct.id)
             .set(newProduct)
@@ -101,7 +105,6 @@ class ProductRepository(private val context: Context) {
             .orderBy("timestamp", Query.Direction.DESCENDING)
 
         if (searchQuery.isNotBlank()) {
-            // Firestore 的簡單搜尋 (注意：這只支援前綴搜尋)
             query = db.collection("products")
                 .orderBy("title")
                 .startAt(searchQuery)
@@ -117,7 +120,7 @@ class ProductRepository(private val context: Context) {
         }
     }
 
-    suspend fun getProductsForMatching(swipedIds: List<String>): List<ProductItem> {
+    suspend fun getProductsForMatching(swipedIds: List<String> = emptyList()): List<ProductItem> {
         val userId = getCurrentUserId()
         return try {
             val snapshot = db.collection("products")
@@ -129,7 +132,7 @@ class ProductRepository(private val context: Context) {
             allProducts.filter { product ->
                 // 1. 排除自己的商品
                 val isNotMine = userId == null || product.ownerId != userId
-                // 2. 排除已經滑過的商品
+                // 2. 排除已經滑過的商品 (swipedIds)
                 val isNotSwiped = !swipedIds.contains(product.id)
 
                 isNotMine && isNotSwiped
@@ -140,7 +143,6 @@ class ProductRepository(private val context: Context) {
         }
     }
 
-    // ★★★【新增】取得單一商品詳情 (ProductDetailScreen 需要) ★★★
     suspend fun getProductById(productId: String): ProductItem? {
         return try {
             val snapshot = db.collection("products").document(productId).get().await()
@@ -151,7 +153,6 @@ class ProductRepository(private val context: Context) {
         }
     }
 
-    // 取得我的商品
     suspend fun getMyProducts(): List<ProductItem> {
         val userId = getCurrentUserId() ?: return emptyList()
         return try {
@@ -166,7 +167,6 @@ class ProductRepository(private val context: Context) {
         }
     }
 
-    // 刪除商品
     suspend fun deleteProduct(productId: String) {
         try {
             db.collection("products").document(productId).delete().await()
@@ -175,6 +175,5 @@ class ProductRepository(private val context: Context) {
         }
     }
 
-    // 相容舊函式
     suspend fun getProductList(): List<ProductItem> = emptyList()
 }

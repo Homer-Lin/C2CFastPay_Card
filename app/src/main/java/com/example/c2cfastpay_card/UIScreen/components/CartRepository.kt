@@ -170,7 +170,7 @@ class CartRepository(private val context: Context) {
                     val price = (item.productPrice.replace(",", "").toLongOrNull() ?: 0L)
                     val cost = price * item.quantity
 
-                    // A. 扣庫存
+                    // A. 扣庫存或刪除商品
                     val productRef = db.collection("products").document(item.productId)
                     val productSnapshot = transaction.get(productRef)
                     val currentStockStr = productSnapshot.getString("stock") ?: "0"
@@ -182,13 +182,20 @@ class CartRepository(private val context: Context) {
                             FirebaseFirestoreException.Code.ABORTED
                         )
                     }
-                    transaction.update(productRef, "stock", (currentStock - item.quantity).toString())
 
-                    // B. ★★★ 加賣家錢 (新增邏輯) ★★★
+                    // ★ 判斷是否賣完
+                    val newStock = currentStock - item.quantity
+                    if (newStock <= 0) {
+                        // 賣完了 -> 刪除商品
+                        transaction.delete(productRef)
+                    } else {
+                        // 還有剩 -> 更新庫存
+                        transaction.update(productRef, "stock", newStock.toString())
+                    }
+
+                    // B. 加賣家錢
                     if (item.sellerId.isNotBlank()) {
                         val sellerRef = db.collection("users").document(item.sellerId)
-                        // 注意：Transaction 內讀取必須在寫入之前，但因為我們可能對同一個賣家加錢多次
-                        // 這裡使用 FieldValue.increment 直接寫入，不需要先讀取，這樣更安全且避免讀寫順序問題
                         transaction.update(sellerRef, "points", FieldValue.increment(cost))
                     }
                 }

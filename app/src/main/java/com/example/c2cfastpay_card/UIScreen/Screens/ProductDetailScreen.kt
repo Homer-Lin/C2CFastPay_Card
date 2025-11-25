@@ -1,11 +1,13 @@
 package com.example.c2cfastpay_card.UIScreen.Screens
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -33,7 +35,7 @@ import com.example.c2cfastpay_card.navigation.Screen
 import com.example.c2cfastpay_card.ui.theme.SaleColorScheme
 import kotlinx.coroutines.launch
 
-// --- 定義顏色 (保持 Figma 風格) ---
+// --- 定義顏色 ---
 val MintGreenAccent = Color(0xFFE0F2F1)
 val MintGreenDark = Color(0xFF487F81)
 val TextBlack = Color(0xFF191C1C)
@@ -46,11 +48,14 @@ fun ProductDetailScreen(
 ) {
     val context = LocalContext.current
     val productRepository = remember { ProductRepository(context) }
-    var product by remember { mutableStateOf<ProductItem?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
     val cartRepository = remember { CartRepository(context) }
     val scope = rememberCoroutineScope()
 
+    // --- 使用本地狀態管理 (不需 ViewModel) ---
+    var product by remember { mutableStateOf<ProductItem?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    // 載入資料
     LaunchedEffect(productId) {
         product = productRepository.getProductById(productId)
         isLoading = false
@@ -85,19 +90,14 @@ fun ProductDetailScreen(
                             val item = product
                             if (item != null) {
                                 scope.launch {
-                                    // 1. 建立 CartItem 物件
                                     val cartItem = com.example.c2cfastpay_card.data.CartItem(
                                         productId = item.id,
                                         productTitle = item.title,
                                         productPrice = item.price,
                                         productImage = item.imageUri,
                                         sellerId = item.ownerId,
-                                        // ★ 關鍵：把庫存傳進去 (如果是空的預設 1)
                                         stock = item.stock.toIntOrNull() ?: 1
                                     )
-
-                                    // 2. 加入購物車 (假設 Repository 已更新為回傳 Boolean)
-                                    // 如果你的 Repository 還沒更新回傳值，把下面改成直接呼叫即可
                                     cartRepository.addToCart(cartItem)
                                     Toast.makeText(context, "已加入購物車", Toast.LENGTH_SHORT).show()
                                 }
@@ -129,9 +129,18 @@ fun ProductDetailScreen(
                 val rawStory = if (item.story.isNullOrBlank()) "" else item.story
                 val displayStock = if (item.stock.isNullOrBlank()) "1" else item.stock
                 val displayCondition = if (item.condition.isNullOrBlank()) "全新" else item.condition
-                // 物流顯示：優先顯示 payment
                 val displayLogistics = item.payment.ifBlank { "7-11、全家、面交" }
                 val displayDescription = if (item.description.isNullOrBlank()) "賣家沒有留下文案。" else item.description
+
+                // ★★★ 圖片處理核心邏輯 ★★★
+                // 1. 合併主圖與副圖，並去除重複與空值
+                val allImages = remember(item) {
+                    (listOf(item.imageUri) + item.images)
+                        .filter { it.isNotEmpty() }
+                        .distinct()
+                }
+                // 2. 記錄當前選中的圖片索引
+                var selectedImageIndex by remember { mutableStateOf(0) }
 
                 Column(
                     modifier = Modifier
@@ -143,7 +152,7 @@ fun ProductDetailScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
 
-                    // 1. 主要圖片
+                    // --- 1. 主要圖片顯示區 ---
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -151,9 +160,11 @@ fun ProductDetailScreen(
                         shape = RoundedCornerShape(24.dp),
                         elevation = CardDefaults.cardElevation(4.dp)
                     ) {
-                        if (item.imageUri.isNotEmpty()) {
+                        if (allImages.isNotEmpty()) {
+                            // 顯示選中的那張圖
+                            val currentImage = allImages.getOrElse(selectedImageIndex) { allImages[0] }
                             Image(
-                                painter = rememberAsyncImagePainter(model = item.imageUri),
+                                painter = rememberAsyncImagePainter(model = currentImage),
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
@@ -170,18 +181,21 @@ fun ProductDetailScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 2. 小縮圖列
-                    val images = listOf(item.imageUri, item.imageUri, item.imageUri)
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(images) { imgUri ->
-                            if (imgUri.isNotEmpty()) {
+                    // --- 2. 縮圖列表區 (只有當圖片大於 1 張時才顯示) ---
+                    if (allImages.size > 1) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            itemsIndexed(allImages) { index, imgUri ->
+                                val isSelected = index == selectedImageIndex
                                 Card(
-                                    modifier = Modifier.size(60.dp),
+                                    modifier = Modifier
+                                        .size(60.dp)
+                                        .clickable { selectedImageIndex = index }, // 點擊切換
                                     shape = RoundedCornerShape(12.dp),
-                                    border = null
+                                    border = if (isSelected) BorderStroke(2.dp, MintGreenDark) else null, // 選中框
+                                    elevation = CardDefaults.cardElevation(if(isSelected) 4.dp else 1.dp)
                                 ) {
                                     Image(
                                         painter = rememberAsyncImagePainter(model = imgUri),
@@ -216,13 +230,12 @@ fun ProductDetailScreen(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // 4. 詳細資訊區 (物流、價格、規格)
+                    // 4. 詳細資訊區
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.Top
                     ) {
-                        // 左欄：物流、價格
                         Column(modifier = Modifier.weight(1f)) {
                             SectionTitle("物流方式")
                             Text(text = displayLogistics, fontSize = 14.sp, color = Color.DarkGray)
@@ -249,12 +262,13 @@ fun ProductDetailScreen(
 
                         Spacer(modifier = Modifier.width(24.dp))
 
-                        // 右欄：規格 (庫存、狀態)
                         Column(modifier = Modifier.weight(1f)) {
                             SectionTitle("商品規格")
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 SpecText(label = "庫存", value = displayStock)
                                 SpecText(label = "狀態", value = displayCondition)
+                                // 賣家資訊
+                                SpecText(label = "賣家", value = item.ownerName.ifBlank { "匿名" })
                             }
                         }
                     }
@@ -263,7 +277,7 @@ fun ProductDetailScreen(
                     Divider(color = Color.LightGray.copy(alpha = 0.5f), thickness = 1.dp)
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // 5. 商品文案 (在中間)
+                    // 5. 商品文案
                     Column(modifier = Modifier.fillMaxWidth()) {
                         SectionTitle("商品文案")
                         Spacer(modifier = Modifier.height(8.dp))
@@ -276,7 +290,7 @@ fun ProductDetailScreen(
                         )
                     }
 
-                    // 6. 商品故事 (在最底，有資料才顯示)
+                    // 6. 商品故事
                     if (rawStory.isNotBlank()) {
                         Spacer(modifier = Modifier.height(32.dp))
                         Column(modifier = Modifier.fillMaxWidth()) {
