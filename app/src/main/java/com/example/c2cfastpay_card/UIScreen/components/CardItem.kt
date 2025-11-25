@@ -132,13 +132,10 @@ fun CardItem(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer {
-                        // 因為卡片已經轉了 180 度，內容也需要轉 180 度才不會變成鏡像字
-                        rotationY = 180f
-                    }
-                    .clickable { isFlipped = false } // 點擊翻回正面
+                    .graphicsLayer { rotationY = 180f }
+                    .clickable { isFlipped = false }
             ) {
-                // 背景圖 (例如名片背景)
+                // 背景圖
                 Image(
                     painter = painterResource(R.drawable.b_14_business_card_front_page),
                     contentDescription = null,
@@ -156,10 +153,10 @@ fun CardItem(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(400.dp) // 固定高度
+                            .height(400.dp)
                             .clip(RoundedCornerShape(24.dp))
                             .background(Color.White.copy(alpha = 0.95f))
-                            .verticalScroll(rememberScrollState()) // 內容過長可捲動
+                            .verticalScroll(rememberScrollState())
                             .padding(20.dp)
                     ) {
                         // 標題與價格
@@ -173,16 +170,19 @@ fun CardItem(
                             text = "NT$ ${product.price}",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFB71C1C), // 深紅色
+                            color = Color(0xFFB71C1C),
                             modifier = Modifier.padding(top = 4.dp)
                         )
 
                         Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color.LightGray)
 
-                        // 詳細資訊列表
+                        // ★★★ 新增：賣家資訊 ★★★
+                        DetailSection("賣家", product.ownerName.ifEmpty { "匿名賣家" })
+
+                        // 其他詳細資訊
                         DetailSection("商品描述", product.description)
                         DetailSection("商品規格", product.specs)
-                        DetailSection("商品故事", product.story) // 這裡顯示故事
+                        DetailSection("商品故事", product.story)
                         DetailSection("注意事項", product.notes)
 
                         Spacer(modifier = Modifier.height(20.dp))

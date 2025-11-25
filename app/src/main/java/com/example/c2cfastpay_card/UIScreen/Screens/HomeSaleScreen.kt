@@ -238,12 +238,16 @@ fun SaleProductPage(
                                 Text(
                                     text = "#${product.condition.ifBlank { "二手" }}",
                                     fontSize = 11.sp,
-                                    color = Color.Gray,
-                                    modifier = Modifier.padding(bottom = 8.dp) // 增加一點底部間距
+                                    color = Color.Gray
                                 )
 
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "賣家: ${product.ownerName.ifBlank { "匿名" }}",
+                                    fontSize = 11.sp,
+                                    color = Color.Gray
+                                )
 
+                                Spacer(modifier = Modifier.height(4.dp))
                                 // 底部欄：價格 + 庫存標籤
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),

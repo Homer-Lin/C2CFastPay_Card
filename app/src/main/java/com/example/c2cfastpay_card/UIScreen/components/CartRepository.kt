@@ -5,6 +5,7 @@ import android.util.Log
 import com.example.c2cfastpay_card.data.CartItem
 // ★★★ 修正 Import：改用標準類別，不要用 ktx ★★★
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.QuerySnapshot
@@ -138,6 +139,87 @@ class CartRepository(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e("CartRepository", "更新失敗", e)
+        }
+    }
+
+    suspend fun checkout(itemsToBuy: List<CartItem>): Result<String> {
+        val userId = getCurrentUserId() ?: return Result.failure(Exception("未登入"))
+
+        if (itemsToBuy.isEmpty()) return Result.failure(Exception("購物車是空的"))
+
+        return try {
+            db.runTransaction { transaction ->
+                // 1. 檢查買家餘額
+                val userRef = db.collection("users").document(userId)
+                val userSnapshot = transaction.get(userRef)
+                val currentPoints = userSnapshot.getLong("points") ?: 0L
+
+                val totalAmount = itemsToBuy.sumOf {
+                    (it.productPrice.replace(",", "").toLongOrNull() ?: 0L) * it.quantity
+                }
+
+                if (currentPoints < totalAmount) {
+                    throw FirebaseFirestoreException(
+                        "餘額不足！(您有 $currentPoints，需支付 $totalAmount)",
+                        FirebaseFirestoreException.Code.ABORTED
+                    )
+                }
+
+                // 2. 處理每個商品 (扣庫存 + 加賣家錢)
+                itemsToBuy.forEach { item ->
+                    val price = (item.productPrice.replace(",", "").toLongOrNull() ?: 0L)
+                    val cost = price * item.quantity
+
+                    // A. 扣庫存
+                    val productRef = db.collection("products").document(item.productId)
+                    val productSnapshot = transaction.get(productRef)
+                    val currentStockStr = productSnapshot.getString("stock") ?: "0"
+                    val currentStock = currentStockStr.toIntOrNull() ?: 0
+
+                    if (currentStock < item.quantity) {
+                        throw FirebaseFirestoreException(
+                            "商品【${item.productTitle}】庫存不足",
+                            FirebaseFirestoreException.Code.ABORTED
+                        )
+                    }
+                    transaction.update(productRef, "stock", (currentStock - item.quantity).toString())
+
+                    // B. ★★★ 加賣家錢 (新增邏輯) ★★★
+                    if (item.sellerId.isNotBlank()) {
+                        val sellerRef = db.collection("users").document(item.sellerId)
+                        // 注意：Transaction 內讀取必須在寫入之前，但因為我們可能對同一個賣家加錢多次
+                        // 這裡使用 FieldValue.increment 直接寫入，不需要先讀取，這樣更安全且避免讀寫順序問題
+                        transaction.update(sellerRef, "points", FieldValue.increment(cost))
+                    }
+                }
+
+                // 3. 扣買家錢
+                transaction.update(userRef, "points", currentPoints - totalAmount)
+
+                // 4. 建立訂單紀錄
+                val orderRef = db.collection("orders").document()
+                val orderData = hashMapOf(
+                    "id" to orderRef.id,
+                    "buyerId" to userId,
+                    "totalAmount" to totalAmount,
+                    "timestamp" to com.google.firebase.Timestamp.now(),
+                    "status" to "COMPLETED",
+                    "items" to itemsToBuy
+                )
+                transaction.set(orderRef, orderData)
+
+                // 5. 移除購物車
+                itemsToBuy.forEach { item ->
+                    val cartItemRef = db.collection("users").document(userId).collection("cart").document(item.id)
+                    transaction.delete(cartItemRef)
+                }
+
+            }.await()
+
+            Result.success("結帳成功！")
+        } catch (e: Exception) {
+            Log.e("CartRepository", "結帳失敗", e)
+            Result.failure(e)
         }
     }
 }
