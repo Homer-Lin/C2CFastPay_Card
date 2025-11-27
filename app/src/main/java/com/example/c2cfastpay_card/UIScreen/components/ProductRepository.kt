@@ -101,19 +101,26 @@ class ProductRepository(private val context: Context) {
 
     // 取得所有商品 (Flow)
     fun getAllProducts(searchQuery: String = ""): Flow<List<ProductItem>> = flow {
-        var query: Query = db.collection("products")
-            .orderBy("timestamp", Query.Direction.DESCENDING)
-
-        if (searchQuery.isNotBlank()) {
-            query = db.collection("products")
-                .orderBy("title")
-                .startAt(searchQuery)
-                .endAt(searchQuery + "\uf8ff")
-        }
-
         try {
+            // 1. 先從資料庫抓取所有商品 (依時間排序)
+            // 注意：如果商品量非常大(幾千筆)，這裡建議只抓最近的100筆，或接用 Algolia 等第三方搜尋服務
+            val query = db.collection("products")
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+
             val snapshot = query.get().await()
-            emit(snapshot.toObjects(ProductItem::class.java))
+            val allItems = snapshot.toObjects(ProductItem::class.java)
+
+            // 2. 在記憶體中進行模糊比對
+            if (searchQuery.isBlank()) {
+                emit(allItems)
+            } else {
+                val filteredList = allItems.filter { item ->
+                    // 比對標題 OR 描述 (忽略大小寫)
+                    item.title.contains(searchQuery, ignoreCase = true) ||
+                            item.description.contains(searchQuery, ignoreCase = true)
+                }
+                emit(filteredList)
+            }
         } catch (e: Exception) {
             Log.e("ProductRepository", "讀取商品失敗", e)
             emit(emptyList())

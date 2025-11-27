@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.c2cfastpay_card.UIScreen.components.BottomNavigationBar
 import com.example.c2cfastpay_card.UIScreen.components.MatchItem
 import com.example.c2cfastpay_card.UIScreen.components.MatchRepository
 import com.example.c2cfastpay_card.navigation.Screen // 【新增】
@@ -64,6 +65,9 @@ fun HistoryScreen(navController: NavController) {
                     containerColor = Color(0xFF759E9F)
                 )
             )
+        },
+        bottomBar = {
+            BottomNavigationBar(navController = navController)
         }
     ) { paddingValues ->
 

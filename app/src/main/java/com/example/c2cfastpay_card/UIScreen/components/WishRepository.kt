@@ -87,14 +87,8 @@ class WishRepository(private val context: Context) {
      * 取得願望列表 (即時監聽 + 搜尋過濾)
      */
     fun getWishListFlow(searchQuery: String = ""): Flow<List<WishItem>> = callbackFlow {
-        var query: Query = wishCollection
-
-        if (searchQuery.isNotBlank()) {
-            query = query.whereGreaterThanOrEqualTo("title", searchQuery)
-                .whereLessThanOrEqualTo("title", searchQuery + "\uf8ff")
-        } else {
-            query = query.orderBy("timestamp", Query.Direction.DESCENDING)
-        }
+        // 1. 總是抓取所有願望，並依時間排序
+        val query = wishCollection.orderBy("timestamp", Query.Direction.DESCENDING)
 
         val listener = query.addSnapshotListener { snapshot: QuerySnapshot?, e: FirebaseFirestoreException? ->
             if (e != null) {
@@ -105,7 +99,18 @@ class WishRepository(private val context: Context) {
 
             if (snapshot != null) {
                 val allWishes = snapshot.toObjects(WishItem::class.java)
-                trySend(allWishes)
+
+                // 2. 在這裡進行過濾 (Fuzzy Search)
+                if (searchQuery.isBlank()) {
+                    trySend(allWishes)
+                } else {
+                    val filteredList = allWishes.filter { item ->
+                        // 比對標題 OR 描述 (忽略大小寫)
+                        item.title.contains(searchQuery, ignoreCase = true) ||
+                                item.description.contains(searchQuery, ignoreCase = true)
+                    }
+                    trySend(filteredList)
+                }
             }
         }
 

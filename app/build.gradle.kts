@@ -76,7 +76,6 @@ dependencies {
 
     // Retrofit
     implementation ("com.squareup.retrofit2:retrofit:2.9.0")
-    // Gson 轉換器 (將 JSON 自動轉換成 Kotlin/Java 物件)
     implementation ("com.squareup.retrofit2:converter-gson:2.9.0")
 
     // Kotlin Coroutines：用於非同步呼叫 (推薦)

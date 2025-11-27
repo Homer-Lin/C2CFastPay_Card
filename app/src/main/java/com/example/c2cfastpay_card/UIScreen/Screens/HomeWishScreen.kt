@@ -113,7 +113,7 @@ fun WishPreviewPage(
                     .align(Alignment.TopCenter)
                     .padding(top = 150.dp)
                     .fillMaxWidth(0.9f)
-                    .height(50.dp)
+                    .height(56.dp)
             ) {
                 OutlinedTextField(
                     value = searchQuery,
@@ -137,19 +137,6 @@ fun WishPreviewPage(
                     ),
                     shape = RoundedCornerShape(24.dp)
                 )
-
-                Spacer(Modifier.width(12.dp))
-
-                IconButton(
-                    onClick = { /* 切換檢視 */ },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.img_7),
-                        contentDescription = "Toggle View",
-                        tint = primaryColor
-                    )
-                }
             }
 
             // --- 許願列表 (Grid 雙欄顯示) ---
@@ -163,7 +150,7 @@ fun WishPreviewPage(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(wishList) { wish ->
-                    // ★ 仿照 SaleProductPage 的卡片設計 ★
+                    //  仿照 SaleProductPage 的卡片設計
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -285,7 +272,7 @@ fun WishPreviewPage(
                         Icon(
                             imageVector = Icons.Default.ShoppingCart,
                             contentDescription = "購物車",
-                            tint = Color.White
+                            tint = Color(0xFFF79329)
                         )
                     }
                 },
