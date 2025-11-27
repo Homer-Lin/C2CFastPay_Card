@@ -4,22 +4,26 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -44,6 +48,7 @@ fun WishPreviewPage(
         .collectAsState(initial = emptyList())
 
     val primaryColor = Color(0xFFFBC02D) // 許願牆主題色 (黃色系)
+    val accentColor = Color(0xFFFF9800)  // 橘色 (快速上架按鈕用)
 
     Scaffold(
         bottomBar = {
@@ -69,7 +74,7 @@ fun WishPreviewPage(
 
             // --- 中層：頁面內容 ---
 
-            // SALE 按鈕 (位置與 HomeSaleScreen 保持對稱)
+            // SALE 按鈕
             IconButton(
                 onClick = { navController.navigate(Screen.Sale.route) },
                 modifier = Modifier
@@ -108,27 +113,18 @@ fun WishPreviewPage(
                     .align(Alignment.TopCenter)
                     .padding(top = 150.dp)
                     .fillMaxWidth(0.9f)
-                    .height(45.dp) // 高度設定與 HomeSaleScreen 一致
+                    .height(56.dp)
             ) {
                 OutlinedTextField(
                     value = searchQuery,
-                    // 【修正】明確指定參數名稱，解決 "Cannot infer type" 錯誤
                     onValueChange = { newText: String -> searchQuery = newText },
                     label = {
-                        Text(
-                            "搜尋商品...",
-                            style = TextStyle(fontSize = 14.sp)
-                        )
+                        Text("搜尋願望...", style = TextStyle(fontSize = 14.sp))
                     },
                     textStyle = TextStyle(fontSize = 14.sp),
                     singleLine = true,
                     leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "搜尋",
-                            tint = Color.Gray,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Icon(Icons.Default.Search, contentDescription = "搜尋", tint = Color.Gray, modifier = Modifier.size(20.dp))
                     },
                     modifier = Modifier
                         .weight(1f)
@@ -140,82 +136,126 @@ fun WishPreviewPage(
                         unfocusedBorderColor = Color.LightGray,
                     ),
                     shape = RoundedCornerShape(24.dp)
-                    // 【修正】移除了不支援的 contentPadding 參數
                 )
-
-                Spacer(Modifier.width(12.dp))
-
-                IconButton(
-                    onClick = { /* 切換檢視 */ },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.img_7),
-                        contentDescription = "Toggle View",
-                        tint = primaryColor
-                    )
-                }
             }
 
-            // 許願列表
-            LazyColumn(
+            // --- 許願列表 (Grid 雙欄顯示) ---
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 220.dp), // 避開上方搜尋列
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(top = 220.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(
-                    items = wishList,
-                    key = { wish -> wish.uuid }
-                ) { wish ->
+                items(wishList) { wish ->
+                    //  仿照 SaleProductPage 的卡片設計
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp)
                             .clickable {
-                                // 未來可導航到許願詳情
+                                // 點擊跳轉到 願望詳情頁 (傳遞 UUID)
+                                navController.navigate("wish_detail/${wish.uuid}")
                             },
-                        shape = RoundedCornerShape(8.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFDF0DF)),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
                         elevation = CardDefaults.cardElevation(4.dp)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            if (wish.imageUri.isNotEmpty()) {
-                                // 直接使用 Coil 載入網址
-                                Image(
-                                    painter = rememberAsyncImagePainter(model = wish.imageUri),
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(120.dp)
-                                        .padding(end = 12.dp),
-                                    contentScale = ContentScale.Crop
-                                )
+                        Column {
+                            // 1. 圖片區域
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f)
+                                    .background(Color(0xFFFFF8E1)) // 淡黃色背景
+                            ) {
+                                if (wish.imageUri.isNotEmpty()) {
+                                    Image(
+                                        painter = rememberAsyncImagePainter(model = wish.imageUri),
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    // 無圖片顯示圖示
+                                    Icon(
+                                        painter = painterResource(R.drawable.wish_button02),
+                                        contentDescription = "No Image",
+                                        tint = Color.LightGray,
+                                        modifier = Modifier.align(Alignment.Center).size(48.dp)
+                                    )
+                                }
                             }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(wish.title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+
+                            // 2. 文字資訊區域
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp)
+                            ) {
+                                // 標題
                                 Text(
-                                    "交易方式：${wish.payment}",
-                                    fontSize = 14.sp,
+                                    text = wish.title,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                // 許願者
+                                Text(
+                                    text = "許願者: ${wish.ownerName.ifBlank { "匿名" }}",
+                                    fontSize = 11.sp,
                                     color = Color.Gray
                                 )
-                                Text("價格：${wish.price}", fontSize = 16.sp, color = Color.Red)
-                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // 預算顯示
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MonetizationOn,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = primaryColor
+                                    )
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text(
+                                        text = "預算 ${wish.price}",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // 底部：快速上架按鈕
                                 Button(
                                     onClick = {
+                                        // ★★★ 關鍵：只要傳送 wishUuid，AddProductScreen 就會自動去抓資料並填入 ★★★
+                                        // (這部分的邏輯我們在 AppNavigation 和 AddProductScreen 已經寫好了)
                                         val wishUuid = wish.uuid
                                         navController.navigate("add_product?wishUuid=$wishUuid")
                                     },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFFFF9800)
-                                    ),
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(32.dp), // 小一點的按鈕，配合卡片尺寸
+                                    colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                                    shape = RoundedCornerShape(50),
+                                    contentPadding = PaddingValues(0.dp)
                                 ) {
-                                    Text("快速上架")
+                                    Text(
+                                        text = "快速上架",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
@@ -223,16 +263,16 @@ fun WishPreviewPage(
                 }
             }
 
-            // --- 頂層：透明標題列與購物車 (Layer On Top) ---
+            // --- 頂層：透明標題列與購物車 ---
             TopAppBar(
-                title = { }, // 留空
+                title = { },
                 navigationIcon = {},
                 actions = {
                     IconButton(onClick = { navController.navigate(Screen.Cart.route) }) {
                         Icon(
                             imageVector = Icons.Default.ShoppingCart,
                             contentDescription = "購物車",
-                            tint = Color.White // 白色圖示，確保在背景圖上清晰可見
+                            tint = Color(0xFFF79329)
                         )
                     }
                 },

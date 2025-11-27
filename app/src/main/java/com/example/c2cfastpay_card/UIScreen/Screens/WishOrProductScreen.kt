@@ -1,68 +1,98 @@
 package com.example.c2cfastpay_card.UIScreen.Screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.c2cfastpay_card.UIScreen.components.BottomNavigationBar
 import com.example.c2cfastpay_card.navigation.Screen
+
+// --- 定義頁面專屬色系 ---
+val SelectionBackground = Color(0xFFF4F7F7) // 淺灰背景，凸顯卡片
+val SaleColor = Color(0xFF487F81)           // 上架主題色 (藍綠)
+val WishColor = Color(0xFFFF9800)           // 許願主題色 (橘)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WishOrProductScreen(navController: NavController) {
     Scaffold(
+        containerColor = SelectionBackground,
         topBar = {
-            TopAppBar(
-                title = { }, // 不需要標題
+            CenterAlignedTopAppBar(
+                title = { }, // 留空，讓視覺集中在中間的內容
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
+                            tint = Color.Gray
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = SelectionBackground
                 )
             )
+        },
+        bottomBar = {
+            BottomNavigationBar(navController = navController)
         }
+
+
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color.White),
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center // 垂直置中
+            verticalArrangement = Arrangement.Center
         ) {
+            // 頁面大標題
+            Text(
+                text = "您想要做什麼？",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFF333333),
+                modifier = Modifier.padding(bottom = 48.dp)
+            )
 
-            // 按鈕 1：我要上架 (綠色)
-            BigSelectionButton(
-                text = "我要上架",
-                color = Color(0xFF487F81),
+            // 選項 1：我要上架 (藍綠色卡片)
+            SelectionCard(
+                title = "我要上架",
+                subtitle = "拍張照，輕鬆販售您的商品",
+                icon = Icons.Default.Storefront,
+                color = SaleColor,
                 onClick = {
-                    // ★ 建議：連到 AddStep1 (拍照/AI流程)
-                    // 如果你想直接手動填寫不經過AI，請改成 Screen.AddProduct.route
                     navController.navigate(Screen.AddStep1.route)
                 }
             )
 
-            Spacer(modifier = Modifier.height(32.dp)) // 兩個按鈕中間的距離
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // 按鈕 2：我要許願 (橘色)
-            BigSelectionButton(
-                text = "我要許願",
-                color = Color(0xFFFF9800),
+            // 選項 2：我要許願 (橘色卡片)
+            SelectionCard(
+                title = "我要許願",
+                subtitle = "找不到心儀商品？直接許願徵求",
+                icon = Icons.Default.AutoAwesome,
+                color = WishColor,
                 onClick = {
                     navController.navigate(Screen.AddWish.route)
                 }
@@ -71,32 +101,67 @@ fun WishOrProductScreen(navController: NavController) {
     }
 }
 
-// 抽取出來的共用按鈕樣式 (正方形、圓角)
+// --- 抽取出來的美化卡片元件 ---
 @Composable
-fun BigSelectionButton(
-    text: String,
+fun SelectionCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
     color: Color,
     onClick: () -> Unit
 ) {
-    Button(
-        onClick = onClick,
+    Card(
         modifier = Modifier
-            .size(160.dp) // 設定正方形大小 (可自行調整)
-            .padding(8.dp),
-        shape = RoundedCornerShape(24.dp), // 圓角
-        colors = ButtonDefaults.buttonColors(
-            containerColor = color
-        ),
-        elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 8.dp,
-            pressedElevation = 4.dp
-        )
+            .fillMaxWidth()
+            .height(160.dp)
+            .shadow(8.dp, RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick), // 讓整張卡片可點擊
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Text(
-            text = text,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // 左側：文字區
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = color
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = subtitle,
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    lineHeight = 20.sp
+                )
+            }
+
+            // 右側：圓形圖示背景
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.1f)), // 淡色背景
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
+        }
     }
 }

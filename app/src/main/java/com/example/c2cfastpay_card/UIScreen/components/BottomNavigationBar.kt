@@ -14,9 +14,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.c2cfastpay_card.R
 import com.example.c2cfastpay_card.navigation.Screen
-import androidx.navigation.NavGraph.Companion.findStartDestination
 
 @Composable
 fun BottomNavigationBar(navController: NavController) {
@@ -28,73 +28,59 @@ fun BottomNavigationBar(navController: NavController) {
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Home 按鈕
-        IconButton(onClick = { navController.navigate(Screen.Sale.route) {
-            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }}) {
-            Icon(
-                painter = painterResource(R.drawable.img_2),
-                contentDescription = "Home"
-            )
-        }
-
-        // Add 按鈕
+        // 1. Home
         IconButton(onClick = {
-            // ★ 修改這裡：連到選擇頁面
-            navController.navigate(Screen.WishOrProduct.route) {
-                popUpTo(navController.graph.startDestinationId) { saveState = true }
+            navController.navigate(Screen.Sale.route) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
         }) {
-            Icon(
-                painter = painterResource(R.drawable.img_3),
-                contentDescription = "Add"
-            )
+            Icon(painter = painterResource(R.drawable.img_2), contentDescription = "Home")
         }
 
-        // Connect 按鈕
-        IconButton(onClick = { navController.navigate(Screen.CardStack.route){
-            popUpTo(navController.graph.startDestinationId) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }}) {
-            Icon(
-                painter = painterResource(R.drawable.img_4),
-                contentDescription = "Connect"
-            )
-        }
-
-        // Chat 按鈕
+        // 2. Add (修改處：改回導向 WishOrProductScreen)
         IconButton(onClick = {
-            // 【修改】導航到「聊天列表 (History)」
+            navController.navigate(Screen.WishOrProduct.route) { // <--- 改回這裡
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }) {
+            Icon(painter = painterResource(R.drawable.img_3), contentDescription = "Add")
+        }
+
+        // 3. Connect
+        IconButton(onClick = {
+            navController.navigate(Screen.CardStack.route) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }) {
+            Icon(painter = painterResource(R.drawable.img_4), contentDescription = "Connect")
+        }
+
+        // 4. Chat
+        IconButton(onClick = {
             navController.navigate(Screen.History.route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
         }) {
-            Icon(
-                painter = painterResource(R.drawable.img_5),
-                contentDescription = "Chat"
-            )
+            Icon(painter = painterResource(R.drawable.img_5), contentDescription = "Chat")
         }
 
-        // User 按鈕
+        // 5. User
         IconButton(onClick = {
-            // 【修改】導航到「會員中心 (User)」
             navController.navigate(Screen.User.route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
         }) {
-            Icon(
-                painter = painterResource(R.drawable.img_6),
-                contentDescription = "User"
-            )
+            Icon(painter = painterResource(R.drawable.img_6), contentDescription = "User")
         }
     }
 }

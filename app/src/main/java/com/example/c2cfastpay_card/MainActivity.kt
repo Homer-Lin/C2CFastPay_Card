@@ -4,29 +4,38 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
-import com.example.c2cfastpay_card.data.largeData
 import com.example.c2cfastpay_card.navigation.AppNavigationGraph
+import com.example.c2cfastpay_card.navigation.Screen // 記得 import Screen
 import com.example.c2cfastpay_card.ui.theme.C2CFastPay_CardTheme
-
-//import com.example.c2cfastpay_card.ui.SaleProductPage
-//import com.example.c2cfastpay_card.ui.WishPreviewPage
+import com.google.firebase.auth.FirebaseAuth // 記得 import FirebaseAuth
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // 1. 檢查登入狀態
+        val auth = FirebaseAuth.getInstance()
+        val currentUser = auth.currentUser
+
+        // 2. 決定起始頁面
+        // 如果有使用者 且 Email 已驗證 -> 直接去販售首頁
+        // 否則 -> 去登入頁
+        val startDestination = if (currentUser != null && currentUser.isEmailVerified) {
+            Screen.Sale.route
+        } else {
+            Screen.Login.route
+        }
+
         setContent {
             C2CFastPay_CardTheme {
                 val navController = rememberNavController()
 
+                // 3. 將起始頁面傳進去
                 AppNavigationGraph(
                     navController = navController,
-//                    cardData = largeData
+                    startDestination = startDestination
                 )
             }
         }

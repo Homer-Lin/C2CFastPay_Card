@@ -1,6 +1,5 @@
 package com.example.c2cfastpay_card.UIScreen.Screens
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,24 +8,24 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility // 新增
+import androidx.compose.material.icons.filled.VisibilityOff // 新增
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation // 新增
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.c2cfastpay_card.R
 import com.example.c2cfastpay_card.navigation.Screen
 import com.example.c2cfastpay_card.ui.theme.C2CFastPay_CardTheme
 
@@ -37,28 +36,23 @@ fun LoginScreen(
     onForgetPasswordClick: () -> Unit
 ) {
     val viewModel: LoginViewModel = viewModel()
-
-    // 定義主色調 (您可以替換成 SaleColorScheme.primary)
     val primaryColor = Color(0xFF487F81)
+
+    // ★★★ 新增：密碼顯示狀態 ★★★
+    var isPasswordVisible by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(Color.White) // 強制白底
     ) {
-        // 1. 頂部裝飾 (可選，這裡放一個簡單的 Header)
+        // 1. 頂部裝飾
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 60.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // TODO: 替換成您的 App Logo 資源
-            // Image(
-            //    painter = painterResource(R.drawable.your_logo),
-            //    contentDescription = "Logo",
-            //    modifier = Modifier.size(100.dp)
-            // )
             Text(
                 text = "C2C FastPay",
                 fontSize = 32.sp,
@@ -81,18 +75,22 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 帳號輸入框 (美化版)
+            // 帳號輸入框
             OutlinedTextField(
                 value = viewModel.loginInput,
                 onValueChange = { viewModel.updateInput(it) },
-                label = { Text("信箱 / 帳號") }, // 【修改】提示支援兩種
+                label = { Text("信箱 / 帳號") },
                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = primaryColor) },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp), // 圓角
+                shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = primaryColor,
                     focusedLabelColor = primaryColor,
-                    cursorColor = primaryColor
+                    cursorColor = primaryColor,
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black,
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White
                 ),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
@@ -100,7 +98,7 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 密碼輸入框 (美化版)
+            // 密碼輸入框
             OutlinedTextField(
                 value = viewModel.loginPassword,
                 onValueChange = { viewModel.updatePassword(it) },
@@ -108,11 +106,29 @@ fun LoginScreen(
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = primaryColor) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                visualTransformation = PasswordVisualTransformation(),
+
+                // ★★★ 修正重點：動態切換顯示模式 ★★★
+                visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+
+                // ★★★ 新增：右側眼睛按鈕 ★★★
+                trailingIcon = {
+                    IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                        Icon(
+                            imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = if (isPasswordVisible) "隱藏密碼" else "顯示密碼",
+                            tint = Color.Gray
+                        )
+                    }
+                },
+
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = primaryColor,
                     focusedLabelColor = primaryColor,
-                    cursorColor = primaryColor
+                    cursorColor = primaryColor,
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black,
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White
                 ),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
@@ -134,7 +150,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 錯誤訊息
             if (viewModel.errorMessage.isNotEmpty()) {
                 Text(
                     text = viewModel.errorMessage,
@@ -153,13 +168,9 @@ fun LoginScreen(
                         }
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
+                modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = primaryColor
-                ),
+                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
                 enabled = !viewModel.isLoading
             ) {
                 if (viewModel.isLoading) {
@@ -171,7 +182,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 切換到註冊
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("還沒有帳號嗎？", color = Color.Gray)
                 TextButton(onClick = onSwitchToRegister) {

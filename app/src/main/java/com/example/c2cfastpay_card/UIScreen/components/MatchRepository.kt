@@ -4,122 +4,210 @@ import android.content.Context
 import android.util.Log
 import com.example.c2cfastpay_card.data.Like
 import com.example.c2cfastpay_card.data.User
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.firestore
-import com.google.firebase.Firebase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
-import java.util.UUID
+
+// 1. 新增滑動方向列舉
+enum class SwipeDirection { LEFT, RIGHT }
+
+// 2. 新增滑動紀錄資料模型
+data class SwipeRecord(
+    val userId: String = "",
+    val productId: String = "",
+    val direction: String = "", // "LEFT" or "RIGHT"
+    val timestamp: Long = System.currentTimeMillis()
+)
 
 class MatchRepository(private val context: Context) {
 
-    private val db = Firebase.firestore
-    private val auth = Firebase.auth
+    private val db = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
 
     private fun getCurrentUserId(): String? {
         return auth.currentUser?.uid
     }
 
     /**
-     * 核心功能：右滑喜歡 (Like)
-     * 回傳值：Boolean (true 代表配對成功！ false 代表只是單向喜歡)
+     * ★ 新增：記錄滑動 (不論左滑右滑都記)
+     * 用來防止卡片重複出現
      */
-    suspend fun likeProduct(product: ProductItem): Boolean {
-        val myId = getCurrentUserId() ?: return false
+    suspend fun recordSwipe(productId: String, direction: SwipeDirection) {
+        val myId = getCurrentUserId() ?: return
 
-        // 1. 取得我的名字 (為了寫入 Like 資料)
-        val mySnapshot = db.collection("users").document(myId).get().await()
-        val me = mySnapshot.toObject(User::class.java)
-        val myName = me?.name ?: "未知用戶"
-
-        // 2. 建立 Like 物件
-        val like = Like(
-            id = "${myId}_${product.id}", // 確保唯一性：我對某個商品只能喜歡一次
-            likerId = myId,
-            likerName = myName,
-            productId = product.id,
-            productOwnerId = product.ownerId
+        val swipeData = SwipeRecord(
+            userId = myId,
+            productId = productId,
+            direction = direction.name
         )
 
-        // 3. 寫入 Firestore "likes" 集合
-        db.collection("likes")
-            .document(like.id)
-            .set(like)
-            .await()
-        Log.d("MatchRepository", "已送出喜歡: ${product.title}")
+        // 使用 "userId_productId" 當作 ID，確保每個商品只會被記錄一次
+        val docId = "${myId}_${productId}"
 
-        // 4. 【關鍵邏輯】檢查是否「配對成功」(Mutual Like)
-        // 檢查對方是否也喜歡過「我的任何一個商品」？
-        // (這是一種簡化的配對邏輯：只要雙方互相喜歡對方的"某個"東西，就算配對)
-        // 或者更嚴格：我喜歡他的 A，他喜歡我的 B (以物易物) -> 這比較複雜。
+        try {
+            db.collection("swipes").document(docId).set(swipeData).await()
+            Log.d("MatchRepository", "已記錄滑動: $productId -> $direction")
+        } catch (e: Exception) {
+            Log.e("MatchRepository", "記錄滑動失敗", e)
+        }
+    }
 
-        // 我們先做「人對人」的興趣檢查：
-        // 查詢：是否有任何一筆 Like，是「對方 (product.ownerId)」喜歡「我 (myId)」的商品？
-        val mutualLikeSnapshot = db.collection("likes")
-            .whereEqualTo("likerId", product.ownerId) // 對方是按讚者
-            .whereEqualTo("productOwnerId", myId)     // 我是商品主人
-            .limit(1) // 只要有一筆就夠了
-            .get()
-            .await()
+    /**
+     * ★ 新增：取得「我已經滑過」的所有商品 ID 列表
+     */
+    suspend fun getSwipedProductIds(): List<String> {
+        val myId = getCurrentUserId() ?: return emptyList()
 
-        if (!mutualLikeSnapshot.isEmpty) {
-            // --- 配對成功！ ---
-            Log.d("MatchRepository", "🎉 配對成功！對方也喜歡你的商品")
-            createMatch(myId, product.ownerId, product)
-            return true
+        return try {
+            val snapshot = db.collection("swipes")
+                .whereEqualTo("userId", myId)
+                .get()
+                .await()
+
+            // 取出所有 productId
+            snapshot.documents.mapNotNull { it.getString("productId") }
+        } catch (e: Exception) {
+            Log.e("MatchRepository", "取得已滑過列表失敗", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * 右滑喜歡 (Like) - 核心功能
+     */
+    suspend fun likeProduct(targetProduct: ProductItem): Boolean {
+        val myId = getCurrentUserId()
+        if (myId == null) return false
+
+        if (targetProduct.ownerId.isBlank()) return false
+
+        Log.d("MatchDebug", "開始執行 Like: 我 ($myId) -> 喜歡 -> 他 (${targetProduct.ownerId})")
+
+        try {
+            // 1. 取得我的名字
+            val mySnapshot = db.collection("users").document(myId).get().await()
+            val me = mySnapshot.toObject(User::class.java)
+            val myName = me?.name ?: "未知用戶"
+
+            // 2. 寫入 Like 資料
+            val like = Like(
+                id = "${myId}_${targetProduct.id}",
+                likerId = myId,
+                likerName = myName,
+                productId = targetProduct.id,
+                productOwnerId = targetProduct.ownerId
+            )
+
+            db.collection("likes").document(like.id).set(like).await()
+
+            // ★ 順便記錄 Swipe (雖然 ViewModel 會呼叫，但這裡雙重確保也好)
+            recordSwipe(targetProduct.id, SwipeDirection.RIGHT)
+
+            // 3. 檢查配對 (Mutual Like)
+            val mutualLikeSnapshot = db.collection("likes")
+                .whereEqualTo("likerId", targetProduct.ownerId)
+                .whereEqualTo("productOwnerId", myId)
+                .limit(1)
+                .get()
+                .await()
+
+            if (!mutualLikeSnapshot.isEmpty) {
+                Log.d("MatchDebug", "配對成功！")
+
+                val theirLikeDoc = mutualLikeSnapshot.documents.first()
+                val myProductIdTheyLiked = theirLikeDoc.getString("productId")
+
+                if (myProductIdTheyLiked != null) {
+                    val myProductDoc = db.collection("products").document(myProductIdTheyLiked).get().await()
+
+                    if (myProductDoc.exists()) {
+                        val originPrice = myProductDoc.get("price")
+                        val safePrice = when (originPrice) {
+                            is Number -> originPrice.toDouble()
+                            is String -> originPrice.toDoubleOrNull() ?: 0.0
+                            else -> 0.0
+                        }
+
+                        val myProductData = hashMapOf<String, Any>(
+                            "id" to myProductDoc.id,
+                            "title" to (myProductDoc.getString("title") ?: "我的商品"),
+                            "imageUrl" to (myProductDoc.getString("imageUri") ?: myProductDoc.getString("imageUrl") ?: ""),
+                            "ownerId" to myId,
+                            "price" to safePrice
+                        )
+
+                        val targetProductPrice = targetProduct.price.toDoubleOrNull() ?: 0.0
+                        val targetProductData = hashMapOf<String, Any>(
+                            "id" to targetProduct.id,
+                            "title" to targetProduct.title,
+                            "imageUrl" to targetProduct.imageUri,
+                            "ownerId" to targetProduct.ownerId,
+                            "price" to targetProductPrice
+                        )
+
+                        createMatchWithDetails(myId, targetProduct.ownerId, myProductData, targetProductData)
+                        return true
+                    }
+                }
+            }
+
+        } catch (e: Exception) {
+            Log.e("MatchDebug", "Like 失敗: ${e.message}", e)
         }
 
         return false
     }
 
-    /**
-     * 建立配對紀錄 (Match) -> 這就是未來的「聊天室」
-     */
-    private suspend fun createMatch(myId: String, otherId: String, product: ProductItem) {
-        // 聊天室 ID：將兩個 UID 排序後組合，確保 A+B 和 B+A 是同一個 ID
+    private suspend fun createMatchWithDetails(
+        myId: String,
+        otherId: String,
+        product1Map: HashMap<String, Any>,
+        product2Map: HashMap<String, Any>
+    ) {
         val userIds = listOf(myId, otherId).sorted()
         val matchId = "${userIds[0]}_${userIds[1]}"
 
         val matchData = hashMapOf(
             "id" to matchId,
-            "users" to userIds, // 參與者列表
+            "users" to userIds,
             "lastMessage" to "配對成功！開始聊天吧",
-            "timestamp" to System.currentTimeMillis(),
-            // 也可以記錄是因為哪個商品配對的
-            "matchedProductImage" to product.imageUri
+            "timestamp" to FieldValue.serverTimestamp(),
+            "product1" to product1Map,
+            "product2" to product2Map
         )
 
-        db.collection("matches")
-            .document(matchId)
-            .set(matchData) // 使用 set (merge) 避免覆蓋舊聊天紀錄
-            .await()
+        db.collection("matches").document(matchId).set(matchData).await()
     }
 
+    // 保留原本的 getMatches
     suspend fun getMatches(): List<MatchItem> {
         val myId = getCurrentUserId() ?: return emptyList()
-
         try {
-            // 查詢：所有「users 欄位包含我」的文件 (也就是我參與的配對)
             val snapshot = db.collection("matches")
                 .whereArrayContains("users", myId)
                 .get()
                 .await()
 
-            // 將 Firestore 資料轉換為 MatchItem
             return snapshot.documents.mapNotNull { doc ->
+                val data = doc.data ?: return@mapNotNull null
+                val p1 = data["product1"] as? Map<String, Any>
+                val p2 = data["product2"] as? Map<String, Any>
+                if (p1 == null || p2 == null) return@mapNotNull null
+
+                val p1OwnerId = p1["ownerId"] as? String
+                val otherProductMap = if (p1OwnerId == myId) p2 else p1
+
                 MatchItem(
                     id = doc.getString("id") ?: "",
-                    productId = "", // 暫時留空
-                    productTitle = doc.getString("matchedProductTitle") ?: "未知商品",
-                    productImageUrl = doc.getString("matchedProductImage") ?: "",
-                    // productPrice 在 MatchItem 定義中如果是 String，就用 getString
-                    // 如果您的 MatchItem 還沒有 price 欄位，這裡可以先不填
-                    timestamp = doc.getLong("timestamp") ?: 0L
+                    productId = otherProductMap["id"] as? String ?: "",
+                    productTitle = otherProductMap["title"] as? String ?: "未知商品",
+                    productImageUrl = otherProductMap["imageUrl"] as? String ?: "",
+                    timestamp = doc.getTimestamp("timestamp")?.seconds ?: 0L
                 )
             }
         } catch (e: Exception) {
-            Log.e("MatchRepository", "讀取配對失敗", e)
             return emptyList()
         }
-    // (原本的 getMatches 函式如果是讀本地的，這裡要暫時移除或改寫成讀取 "matches" 集合)
     }
 }

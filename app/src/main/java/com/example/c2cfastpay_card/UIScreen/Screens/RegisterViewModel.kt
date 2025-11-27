@@ -56,7 +56,6 @@ class RegisterViewModel : ViewModel() {
 
         isRegisterEnabled = isEmailValid && isPasswordValid && isConfirmPasswordValid && isUsernameValid && privacyPolicyChecked
 
-        // 【修正】將這裡的英文改為中文
         errorMessage = when {
             !isUsernameValid && username.isNotEmpty() -> "請輸入帳號名稱"
             !isEmailValid && email.isNotEmpty() -> "請輸入有效的電子信箱"
@@ -65,7 +64,6 @@ class RegisterViewModel : ViewModel() {
             !privacyPolicyChecked -> "請勾選同意隱私權條款"
             else -> ""
         }
-        // 如果所有欄位都是空的，不顯示錯誤訊息
         if(email.isEmpty() && password.isEmpty() && confirmPassword.isEmpty() && username.isEmpty()) errorMessage = ""
     }
 
@@ -83,12 +81,13 @@ class RegisterViewModel : ViewModel() {
                     val firebaseUser = result.user
 
                     if (firebaseUser != null) {
-                        // 2. 建立 User 資料
+                        // 2. 建立 User 資料 (包含 99999 購物金)
                         val newUser = User(
                             id = firebaseUser.uid,
                             email = email,
                             name = username,
-                            avatarUrl = ""
+                            avatarUrl = "",
+                            points = 99999 // 【關鍵修改】
                         )
 
                         db.collection("users")
@@ -101,20 +100,19 @@ class RegisterViewModel : ViewModel() {
 
                         withContext(Dispatchers.Main) {
                             isLoading = false
-                            // 【修正】成功訊息也中文化
                             errorMessage = "驗證信已發送！若未收到，請檢查垃圾郵件匣，並點擊連結完成驗證。"
+                            // 這裡可以選擇直接 onSuccess() 或讓使用者看訊息
+                            // 這裡保持原樣，僅顯示訊息
                         }
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
                         isLoading = false
-                        // 【修正】錯誤訊息處理
-                        // Firebase 的錯誤訊息通常是英文，我們可以簡單翻譯幾個常見的
                         errorMessage = when {
                             e.message?.contains("The email address is already in use") == true -> "此信箱已被註冊"
                             e.message?.contains("The email address is badly formatted") == true -> "信箱格式錯誤"
                             e.message?.contains("Password should be at least 6 characters") == true -> "密碼長度不足"
-                            else -> "註冊失敗：${e.message}" // 其他錯誤保留原文以免誤判
+                            else -> "註冊失敗：${e.message}"
                         }
                     }
                 }

@@ -4,62 +4,79 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.example.c2cfastpay_card.data.User
-import com.google.firebase.auth.auth
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.firestore
-import com.google.firebase.Firebase
-import com.google.firebase.storage.storage
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
-class ProductRepository(private val context: Context) { // Context 雖然這裡暫時沒用到，但保留架構
+class ProductRepository(private val context: Context) {
 
-    private val db = Firebase.firestore
-    private val auth = Firebase.auth
-    private val storage = Firebase.storage
+    private val db = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
+    private val storage = FirebaseStorage.getInstance()
 
-    // 取得當前用戶 ID
-    private fun getCurrentUserId(): String? {
-        return auth.currentUser?.uid
-    }
+    private fun getCurrentUserId(): String? = auth.currentUser?.uid
 
     /**
-     * 1. 上架商品 (包含圖片上傳)
+     * 上架商品 (支援多圖上傳)
      */
-    suspend fun addProduct(product: ProductItem) {
+    suspend fun addProduct(product: ProductItem, imageUris: List<Uri> = emptyList()) {
         val userId = getCurrentUserId() ?: throw Exception("尚未登入")
 
-        // A. 取得使用者資料 (為了填寫 ownerName)
-        val userSnapshot = db.collection("users").document(userId).get().await()
-        val user = userSnapshot.toObject(User::class.java)
-        val userName = user?.name ?: "未知賣家"
-        val userEmail = user?.email ?: ""
+        // 1. 取得使用者資料
+        val userName = try {
+            val userSnapshot = db.collection("users").document(userId).get().await()
+            val user = userSnapshot.toObject(User::class.java)
+            user?.name ?: "未知賣家"
+        } catch (e: Exception) {
+            "未知賣家"
+        }
+        val userEmail = auth.currentUser?.email ?: ""
 
-        // B. 處理圖片上傳
-        var finalImageUrl = ""
-        if (product.imageUri.isNotEmpty()) {
-            // 如果是 content:// 開頭的本地路徑，就上傳到 Storage
-            if (product.imageUri.startsWith("content://") || product.imageUri.startsWith("file://")) {
-                finalImageUrl = uploadImageToStorage(Uri.parse(product.imageUri))
-            } else {
-                // 如果已經是網址 (雖然上架時不太可能)，直接使用
-                finalImageUrl = product.imageUri
+        // 2. 準備要上傳的圖片清單
+        val uploadedImageUrls = product.images.toMutableList()
+
+        // ★★★ 修正重點：先整理出要上傳的 Uri 列表，並去除重複 ★★★
+        val urisToUpload = imageUris.distinct().toMutableList()
+
+        // 檢查主圖 (product.imageUri) 是否需要加入上傳列表
+        // 如果它不是網址(是本地路徑)，且不在 imageUris 列表中，才需要加進去
+        if (product.imageUri.isNotEmpty()
+            && !product.imageUri.startsWith("http")
+            && !product.imageUri.startsWith("https")) {
+
+            val mainUri = Uri.parse(product.imageUri)
+            if (!urisToUpload.contains(mainUri)) {
+                urisToUpload.add(0, mainUri) // 加在最前面
             }
         }
 
-        // C. 準備要寫入的資料 (補上擁有者資訊)
+        // 3. 執行上傳 (只對整理好的列表跑迴圈)
+        for (uri in urisToUpload) {
+            val url = uploadImageToStorage(uri)
+            if (url.isNotEmpty()) {
+                uploadedImageUrls.add(url)
+            }
+        }
+
+        // 4. 設定最終的主圖網址 (取上傳後的第一張)
+        val finalMainImage = if (uploadedImageUrls.isNotEmpty()) uploadedImageUrls[0] else ""
+
+        // 5. 準備寫入資料
         val newProduct = product.copy(
-            imageUri = finalImageUrl, // 換成雲端網址
+            imageUri = finalMainImage, // 更新首圖為網址
+            images = uploadedImageUrls,
             ownerId = userId,
             ownerName = userName,
             ownerEmail = userEmail,
             timestamp = System.currentTimeMillis()
         )
 
-        // D. 寫入 Firestore
-        // 使用 product.id 作為文件 ID，方便之後搜尋或刪除
+        // 6. 寫入 Firestore
         db.collection("products")
             .document(newProduct.id)
             .set(newProduct)
@@ -68,102 +85,102 @@ class ProductRepository(private val context: Context) { // Context 雖然這裡�
         Log.d("ProductRepository", "商品上架成功: ${newProduct.title}")
     }
 
-    /**
-     * 輔助函式：上傳圖片到 Firebase Storage 並回傳下載網址
-     */
+    // 上傳圖片輔助函式
     private suspend fun uploadImageToStorage(uri: Uri): String {
-        val userId = getCurrentUserId() ?: return ""
-        // 檔名：images/用戶ID/隨機ID.jpg
-        val filename = "images/$userId/${UUID.randomUUID()}.jpg"
-        val ref = storage.reference.child(filename)
-
-        // 上傳
-        ref.putFile(uri).await()
-
-        // 取得下載網址
-        val downloadUrl = ref.downloadUrl.await()
-        return downloadUrl.toString()
+        return try {
+            val userId = getCurrentUserId() ?: "guest"
+            val filename = "images/$userId/${UUID.randomUUID()}.jpg"
+            val ref = storage.reference.child(filename)
+            ref.putFile(uri).await()
+            return ref.downloadUrl.await().toString()
+        } catch (e: Exception) {
+            Log.e("ProductRepository", "圖片上傳失敗: $uri", e)
+            ""
+        }
     }
 
-    /**
-     * 2. 取得「所有」商品 (改為 Flow 以便即時更新)
-     * 這裡可以用來在首頁顯示
-     */
+    // 取得所有商品 (Flow)
     fun getAllProducts(searchQuery: String = ""): Flow<List<ProductItem>> = flow {
-        val query = db.collection("products")
-            .orderBy("timestamp", Query.Direction.DESCENDING)
-
-        // 如果有搜尋字，進行篩選 (這裡使用簡單的 title 範圍搜尋)
-        val finalQuery = if (searchQuery.isNotBlank()) {
-            // 注意：Firestore 的範圍搜尋限制較多，這裡示範基本的前綴搜尋
-            // 若要更強大的搜尋通常需要第三方服務 (如 Algolia)
-            db.collection("products")
-                .whereGreaterThanOrEqualTo("title", searchQuery)
-                .whereLessThanOrEqualTo("title", searchQuery + "\uf8ff")
-                .orderBy("title", Query.Direction.ASCENDING)
-        } else {
-            query
-        }
-
         try {
-            val snapshot = finalQuery.get().await()
-            val products = snapshot.toObjects(ProductItem::class.java)
-            emit(products)
+            // 1. 先從資料庫抓取所有商品 (依時間排序)
+            // 注意：如果商品量非常大(幾千筆)，這裡建議只抓最近的100筆，或接用 Algolia 等第三方搜尋服務
+            val query = db.collection("products")
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+
+            val snapshot = query.get().await()
+            val allItems = snapshot.toObjects(ProductItem::class.java)
+
+            // 2. 在記憶體中進行模糊比對
+            if (searchQuery.isBlank()) {
+                emit(allItems)
+            } else {
+                val filteredList = allItems.filter { item ->
+                    // 比對標題 OR 描述 (忽略大小寫)
+                    item.title.contains(searchQuery, ignoreCase = true) ||
+                            item.description.contains(searchQuery, ignoreCase = true)
+                }
+                emit(filteredList)
+            }
         } catch (e: Exception) {
             Log.e("ProductRepository", "讀取商品失敗", e)
             emit(emptyList())
         }
     }
 
-    /**
-     * 3. 取得「配對用」商品
-     * 規則：只顯示「別人」的商品 (排除自己)
-     */
-    suspend fun getProductsForMatching(): List<ProductItem> {
-        val userId = getCurrentUserId() ?: return emptyList()
+    suspend fun getProductsForMatching(swipedIds: List<String> = emptyList()): List<ProductItem> {
+        val userId = getCurrentUserId()
+        return try {
+            val snapshot = db.collection("products")
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .get().await()
 
-        val snapshot = db.collection("products")
-            .whereNotEqualTo("ownerId", userId) // 過濾掉自己的
-            .get()
-            .await()
+            val allProducts = snapshot.toObjects(ProductItem::class.java)
 
-        // 注意：Firestore 的 whereNotEqualTo 可能需要建立索引，
-        // 如果 Logcat 報錯說需要 Index，請點擊錯誤訊息裡的連結去建立。
+            allProducts.filter { product ->
+                // 1. 排除自己的商品
+                val isNotMine = userId == null || product.ownerId != userId
+                // 2. 排除已經滑過的商品 (swipedIds)
+                val isNotSwiped = !swipedIds.contains(product.id)
 
-        return snapshot.toObjects(ProductItem::class.java)
-            .shuffled() // 隨機排序，增加配對趣味性
+                isNotMine && isNotSwiped
+            }
+        } catch (e: Exception) {
+            Log.e("ProductRepository", "讀取配對商品失敗", e)
+            emptyList()
+        }
     }
 
     suspend fun getProductById(productId: String): ProductItem? {
         return try {
-            val document = db.collection("products")
-                .document(productId)
-                .get()
-                .await()
-            document.toObject(ProductItem::class.java)
+            val snapshot = db.collection("products").document(productId).get().await()
+            snapshot.toObject(ProductItem::class.java)
         } catch (e: Exception) {
             Log.e("ProductRepository", "找不到商品: $productId", e)
             null
         }
     }
+
     suspend fun getMyProducts(): List<ProductItem> {
         val userId = getCurrentUserId() ?: return emptyList()
-
-        // 這裡可能需要複合索引 (ownerId + timestamp)
-        // 如果 Logcat 報錯，請依照連結建立索引
-        val snapshot = db.collection("products")
-            .whereEqualTo("ownerId", userId)
-            .orderBy("timestamp", Query.Direction.DESCENDING)
-            .get()
-            .await()
-
-        return snapshot.toObjects(ProductItem::class.java)
+        return try {
+            val snapshot = db.collection("products")
+                .whereEqualTo("ownerId", userId)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .get().await()
+            snapshot.toObjects(ProductItem::class.java)
+        } catch (e: Exception) {
+            Log.e("ProductRepository", "讀取我的商品失敗", e)
+            emptyList()
+        }
     }
+
     suspend fun deleteProduct(productId: String) {
-        db.collection("products")
-            .document(productId)
-            .delete()
-            .await()
-        // 選擇性：如果有上傳圖片，這裡也應該去 Storage 刪除圖片
+        try {
+            db.collection("products").document(productId).delete().await()
+        } catch (e: Exception) {
+            Log.e("ProductRepository", "刪除失敗", e)
+        }
     }
+
+    suspend fun getProductList(): List<ProductItem> = emptyList()
 }
