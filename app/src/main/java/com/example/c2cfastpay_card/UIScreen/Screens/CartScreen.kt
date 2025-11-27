@@ -1,5 +1,6 @@
 package com.example.c2cfastpay_card.UIScreen.Screens
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,7 +33,6 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.c2cfastpay_card.data.CartItem
 import com.example.c2cfastpay_card.UIScreen.components.CartRepository
 import com.example.c2cfastpay_card.ui.theme.SaleColorScheme
-import androidx.compose.material.icons.filled.ShoppingCart
 import com.example.c2cfastpay_card.navigation.Screen
 
 // 定義主題色 (深綠色)
@@ -48,6 +49,17 @@ fun CartScreen(navController: NavController) {
 
     val cartItems by viewModel.cartItems.collectAsState()
     val totalPrice by viewModel.totalPrice.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+
+    // 計算已選數量
+    val selectedCount = cartItems.count { it.isChecked }
+
+    // 監聽結帳結果 Toast
+    LaunchedEffect(Unit) {
+        viewModel.toastMessage.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // 計算已選數量
     val selectedCount = cartItems.count { it.isChecked }
@@ -92,14 +104,14 @@ fun CartScreen(navController: NavController) {
                                     text = "NT$ $totalPrice",
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.Black // 參考圖是黑色或深色
+                                    color = Color.Black
                                 )
                             }
 
-                            // 結帳按鈕 (只有選取商品時才啟用)
+                            // 結帳按鈕
                             Button(
                                 onClick = { viewModel.checkout() },
-                                enabled = selectedCount > 0,
+                                enabled = selectedCount > 0 && !isLoading,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = PrimaryGreen,
                                     disabledContainerColor = Color.LightGray
@@ -107,103 +119,112 @@ fun CartScreen(navController: NavController) {
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp)
                             ) {
-                                Text(
-                                    text = "去結帳 ($selectedCount)",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        color = Color.White,
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text(
+                                        text = "去結帳 ($selectedCount)",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         ) { innerPadding ->
-            if (cartItems.isEmpty()) {
-                // --- 空購物車畫面 (修正版) ---
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .background(Color.White), // 背景全白
-                    verticalArrangement = Arrangement.Center, // 垂直置中
-                    horizontalAlignment = Alignment.CenterHorizontally // 水平置中
-                ) {
-                    // 加一個大圖示，讓畫面不會太空
-                    Icon(
-                        imageVector = Icons.Default.ShoppingCart,
-                        contentDescription = null,
-                        modifier = Modifier.size(100.dp),
-                        tint = Color(0xFFE0E0E0) // 淺灰色圖示
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // 文字 (強制設定為黑色，保證看得到)
-                    Text(
-                        text = "購物車是空的",
-                        color = Color.Black,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "趕快去挑選喜歡的商品吧！",
-                        color = Color.Gray,
-                        fontSize = 14.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // 按鈕 (強制設定文字顏色為白色)
-                    Button(
-                        onClick = {
-                            // ★★★ 修改這裡 ★★★
-                            // 原本是 navController.popBackStack()
-                            // 改成導航去販售首頁 (Screen.Sale.route)
-                            navController.navigate(Screen.Sale.route) {
-                                // 這行設定的意思是：跳轉後，把堆疊清空直到 Sale 頁面
-                                // 這樣使用者按手機「返回鍵」時，不會又回到這個空的購物車頁面
-                                popUpTo(Screen.Sale.route) { inclusive = true }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = PrimaryGreen,
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(50)
+            Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                if (cartItems.isEmpty()) {
+                    // --- 空購物車畫面 ---
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.White),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.ShoppingCart,
+                            contentDescription = null,
+                            modifier = Modifier.size(100.dp),
+                            tint = Color(0xFFE0E0E0)
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
                         Text(
-                            text = "去逛逛",
-                            fontSize = 16.sp,
+                            text = "購物車是空的",
+                            color = Color.Black,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "趕快去挑選喜歡的商品吧！",
+                            color = Color.Gray,
+                            fontSize = 14.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Button(
+                            onClick = {
+                                navController.navigate(Screen.Sale.route) {
+                                    popUpTo(Screen.Sale.route) { inclusive = true }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PrimaryGreen,
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(50)
+                        ) {
+                            Text(
+                                text = "去逛逛",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                } else {
+                    // --- 購物車列表 ---
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFFFAFAFA)),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(cartItems, key = { it.id }) { item ->
+                            CartItemRow(
+                                item = item,
+                                onToggleCheck = { viewModel.toggleItemChecked(item) },
+                                onIncrease = { viewModel.increaseQuantity(item) },
+                                onDecrease = { viewModel.decreaseQuantity(item) },
+                                onDelete = { viewModel.removeItem(item.id) }
+                            )
+                        }
                     }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .background(Color(0xFFFAFAFA)), // 極淡的灰色背景
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(cartItems, key = { it.id }) { item ->
-                        CartItemRow(
-                            item = item,
-                            // ★★★ 修正 1：這裡要傳 item (物件)，不要傳 item.id ★★★
-                            onToggleCheck = { viewModel.toggleItemChecked(item) },
 
-                            // ★★★ 修正 2：這兩個通常也需要 item (取決於你的 ViewModel 定義) ★★★
-                            onIncrease = { viewModel.increaseQuantity(item) },
-                            onDecrease = { viewModel.decreaseQuantity(item) },
-
-                            // ★★★ 修正 3：刪除通常只需要 ID，所以這裡維持 item.id 沒錯 ★★★
-                            onDelete = { viewModel.removeItem(item.id) }
-                        )
+                // --- 全螢幕 Loading 遮罩 ---
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f))
+                            .clickable(enabled = false) {},
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color.White)
                     }
                 }
             }
@@ -222,26 +243,34 @@ fun CartItemRow(
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(0.dp), // 平面化設計
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEEEEEE)) // 淡邊框
+        elevation = CardDefaults.cardElevation(0.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEEEEEE))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            // 【修正 1】改為頂部對齊，讓內容可以向下延伸
+            verticalAlignment = Alignment.Top
         ) {
-            // 1. 勾選框
-            Checkbox(
-                checked = item.isChecked,
-                onCheckedChange = { onToggleCheck() },
-                colors = CheckboxDefaults.colors(
-                    checkedColor = PrimaryGreen,
-                    uncheckedColor = Color.LightGray
+            // 1. 勾選框 (保持置中)
+            Box(
+                modifier = Modifier
+                    .height(80.dp) // 與圖片同高，讓 Checkbox 垂直置中
+                    .wrapContentWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Checkbox(
+                    checked = item.isChecked,
+                    onCheckedChange = { onToggleCheck() },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = PrimaryGreen,
+                        uncheckedColor = Color.LightGray
+                    )
                 )
-            )
+            }
 
-            // 2. 商品圖片
+            // 2. 商品圖片 (固定大小)
             Box(
                 modifier = Modifier
                     .size(80.dp)
@@ -256,7 +285,6 @@ fun CartItemRow(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    // 無圖片
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("No Img", fontSize = 10.sp, color = Color.Gray)
                     }
@@ -268,11 +296,11 @@ fun CartItemRow(
             // 3. 商品資訊與控制
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .height(80.dp), // 固定高度讓排版整齊
-                verticalArrangement = Arrangement.SpaceBetween
+                    .weight(1f), // 佔滿剩餘寬度
+                // .height(80.dp) // 【修正 2】移除固定高度限制
+                verticalArrangement = Arrangement.spacedBy(8.dp) // 【修正 3】增加間距
             ) {
-                // 標題與刪除鈕 (Row)
+                // 標題與刪除鈕
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -285,10 +313,9 @@ fun CartItemRow(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         color = Color(0xFF333333),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).padding(end = 4.dp)
                     )
 
-                    // 垃圾桶放在右上角
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "刪除",
@@ -299,13 +326,12 @@ fun CartItemRow(
                     )
                 }
 
-                // 價格與數量控制 (Row)
+                // 價格與數量控制
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 價格
                     Text(
                         text = "NT$ ${item.productPrice}",
                         fontSize = 16.sp,
@@ -313,12 +339,10 @@ fun CartItemRow(
                         color = Color.Black
                     )
 
-                    // 數量控制器 [- 1 +]
                     QuantitySelector(
                         quantity = item.quantity,
                         onIncrease = onIncrease,
                         onDecrease = onDecrease,
-                        // 如果數量達到庫存上限，加號變灰
                         isMaxReached = item.quantity >= item.stock
                     )
                 }
@@ -327,7 +351,6 @@ fun CartItemRow(
     }
 }
 
-// 獨立出來的數量控制器元件 (美化版)
 @Composable
 fun QuantitySelector(
     quantity: Int,
@@ -341,7 +364,6 @@ fun QuantitySelector(
             .border(1.dp, Color.LightGray, RoundedCornerShape(4.dp))
             .height(28.dp)
     ) {
-        // 減號
         IconButton(
             onClick = onDecrease,
             modifier = Modifier.size(28.dp),
@@ -355,12 +377,11 @@ fun QuantitySelector(
             )
         }
 
-        // 數字
         Box(
             modifier = Modifier
                 .width(32.dp)
                 .fillMaxHeight()
-                .border(width = 1.dp, color = Color(0xFFF0F0F0)), // 中間分隔線效果(模擬)
+                .border(width = 1.dp, color = Color(0xFFF0F0F0)),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -370,7 +391,6 @@ fun QuantitySelector(
             )
         }
 
-        // 加號
         IconButton(
             onClick = onIncrease,
             modifier = Modifier.size(28.dp),

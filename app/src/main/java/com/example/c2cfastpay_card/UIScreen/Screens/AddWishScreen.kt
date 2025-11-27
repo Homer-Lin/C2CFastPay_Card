@@ -18,337 +18,255 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Title
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
+import com.example.c2cfastpay_card.UIScreen.components.WishRepository
 import com.example.c2cfastpay_card.navigation.Screen
+
+val WishPrimary = Color(0xFFFF9800)
+val WishLight = Color(0xFFFFF3E0)
+val WishText = Color(0xFF191C1C)
+val WishBackground = Color(0xFFFDFBF7)
+val SaleGreenButton = Color(0xFF487F81)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddWishScreen(navController: NavController) {
     val context = LocalContext.current
+    val wishRepository = remember { WishRepository(context) }
+    val viewModel: AddWishViewModel = viewModel(factory = AddWishViewModelFactory(wishRepository))
     val scrollState = rememberScrollState()
 
-    // --- 定義顏色 ---
-    val mainOrangeColor = Color(0xFFFF9800) // 主題橘色
-    val buttonGreenColor = Color(0xFF487F81) // 右上角按鈕用的綠色
-
-    // --- 1. 狀態變數 ---
     var photoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
-
-    // 欄位變數
     var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") } // 願望描述
-    var price by remember { mutableStateOf("") }       // 願付價格
-    var quantity by remember { mutableStateOf("1") }   // 欲購數量
-    var note by remember { mutableStateOf("") }        // 備註 (新增的)
-
-    // 新舊狀態 (新增"皆可")
+    var description by remember { mutableStateOf("") }
+    var price by remember { mutableStateOf("") }
+    var quantity by remember { mutableStateOf("1") }
+    var note by remember { mutableStateOf("") }
     val statusOptions = listOf("全新", "二手", "皆可")
     var selectedStatus by remember { mutableStateOf(statusOptions[0]) }
     var statusExpanded by remember { mutableStateOf(false) }
-
-    // 物流方式
     val logisticOptions = listOf("7-11", "全家", "面交")
     var selectedLogistics by remember { mutableStateOf(setOf<String>()) }
 
-    // 圖片選擇器
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
-    ) { uris ->
+    LaunchedEffect(viewModel.statusMessage) {
+        viewModel.statusMessage?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            viewModel.clearStatus()
+        }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         photoUris = photoUris + uris
     }
 
     Scaffold(
+        containerColor = WishBackground,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("新增願望", style = MaterialTheme.typography.titleLarge) },
+                title = { Text("新增願望", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = WishText)) },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    // ★★★ 修改處：指定返回到 WishOrProductScreen ★★★
+                    IconButton(onClick = {
+                        navController.popBackStack(Screen.WishOrProduct.route, inclusive = false)
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = WishText)
                     }
                 },
-                // 右上角按鈕：樣式依照要求 (綠色框/底)，文字改為"我要上架"
                 actions = {
                     Button(
-                        onClick = {
-                            navController.navigate(Screen.AddStep1.route)
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = buttonGreenColor
-                        ),
+                        onClick = { navController.navigate(Screen.AddStep1.route) },
+                        colors = ButtonDefaults.buttonColors(containerColor = SaleGreenButton),
                         shape = RoundedCornerShape(50),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                        modifier = Modifier
-                            .padding(end = 12.dp)
-                            .height(36.dp)
+                        modifier = Modifier.padding(end = 12.dp).height(36.dp)
                     ) {
-                        Text(
-                            text = "我要上架",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("我要上架", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.White
-                )
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.White)
             )
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(Color(0xFFFFF8E1)) // 淡橘黃色背景
-                .verticalScroll(scrollState)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-
-            // --- 圖片區塊 (參考圖片) ---
-            Text("參考圖片 (選填)", modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.Gray)
-            LazyRow(
-                modifier = Modifier.fillMaxWidth().height(120.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(innerPadding).verticalScroll(scrollState).padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                items(photoUris) { uri ->
-                    Box(modifier = Modifier.size(110.dp)) {
-                        Image(
-                            painter = rememberAsyncImagePainter(uri),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(12.dp))
-                                .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Remove",
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(4.dp)
-                                .size(20.dp)
-                                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                                .clickable { photoUris = photoUris - uri },
-                            tint = Color.White
-                        )
-                    }
-                }
-                item {
-                    Box(
-                        modifier = Modifier
-                            .size(110.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White)
-                            .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
-                            .clickable { galleryLauncher.launch("image/*") },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = Color.Gray)
-                            Text("新增照片", fontSize = 12.sp, color = Color.Gray)
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(2.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.width(4.dp).height(16.dp).background(WishPrimary, CircleShape))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("參考圖片", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = WishText)
+                            Text(" (選填，可上傳多張)", fontSize = 12.sp, color = Color.Gray)
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            items(photoUris) { uri ->
+                                Box(modifier = Modifier.size(100.dp)) {
+                                    Image(
+                                        painter = rememberAsyncImagePainter(uri),
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).border(1.dp, Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Remove",
+                                        modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(20.dp).background(Color.Black.copy(alpha = 0.6f), CircleShape).padding(2.dp).clickable { photoUris = photoUris - uri },
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                            item {
+                                Box(
+                                    modifier = Modifier.size(100.dp).clip(RoundedCornerShape(12.dp)).background(WishLight.copy(alpha = 0.3f)).border(2.dp, WishPrimary.copy(alpha = 0.3f), RoundedCornerShape(12.dp)).clickable { galleryLauncher.launch("image/*") },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = WishPrimary, modifier = Modifier.size(32.dp))
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("新增", fontSize = 12.sp, color = WishPrimary, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
-            // --- 輸入欄位區 (使用橘色主題 TextField) ---
-
-            // 標題
-            WishTextField(value = title, onValueChange = { title = it }, label = "願望標題", themeColor = mainOrangeColor)
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 願望描述
-            WishTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = "願望描述 (例如：希望是哪一年的款式...)",
-                singleLine = false,
-                modifier = Modifier.height(120.dp),
-                themeColor = mainOrangeColor
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 願付價格 與 欲購數量
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                WishTextField(
-                    value = price,
-                    onValueChange = { if (it.all { c -> c.isDigit() }) price = it },
-                    label = "願付價格",
-                    keyboardType = KeyboardType.Number,
-                    modifier = Modifier.weight(1f),
-                    themeColor = mainOrangeColor
-                )
-                WishTextField(
-                    value = quantity,
-                    onValueChange = { if (it.all { c -> c.isDigit() }) quantity = it },
-                    label = "欲購數量",
-                    keyboardType = KeyboardType.Number,
-                    modifier = Modifier.weight(1f),
-                    themeColor = mainOrangeColor
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // --- 新舊狀態 (下拉選單) ---
-            ExposedDropdownMenuBox(
-                expanded = statusExpanded,
-                onExpandedChange = { statusExpanded = !statusExpanded },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                OutlinedTextField(
-                    value = selectedStatus,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("接受狀態") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = statusExpanded) },
-                    modifier = Modifier.menuAnchor().fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    // ★★★ 設定下拉選單文字顏色為黑色 ★★★
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedBorderColor = mainOrangeColor,
-                        focusedLabelColor = mainOrangeColor,
-                        focusedTextColor = Color.Black,   // 聚焦時黑色
-                        unfocusedTextColor = Color.Black  // 失焦時黑色
-                    )
-                )
-                ExposedDropdownMenu(
-                    expanded = statusExpanded,
-                    onDismissRequest = { statusExpanded = false }
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(2.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    statusOptions.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option) },
-                            onClick = {
-                                selectedStatus = option
-                                statusExpanded = false
+                    Column(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        BeautifulWishTextField(value = title, onValueChange = { title = it }, label = "願望標題", icon = Icons.Default.Title, placeholder = "例如：PS5 遊戲主機")
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            BeautifulWishTextField(value = price, onValueChange = { if (it.all { c -> c.isDigit() }) price = it }, label = "願付價格", icon = Icons.Default.AttachMoney, keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
+                            BeautifulWishTextField(value = quantity, onValueChange = { if (it.all { c -> c.isDigit() }) quantity = it }, label = "欲購數量", icon = Icons.Default.ShoppingCart, keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
+                        }
+                        ExposedDropdownMenuBox(expanded = statusExpanded, onExpandedChange = { statusExpanded = !statusExpanded }, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = selectedStatus, onValueChange = {}, readOnly = true, label = { Text("接受狀態") },
+                                leadingIcon = { Icon(Icons.Default.Category, contentDescription = null, tint = WishPrimary) },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = statusExpanded) },
+                                modifier = Modifier.menuAnchor().fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White, focusedBorderColor = WishPrimary, unfocusedBorderColor = Color.LightGray, focusedLabelColor = WishPrimary, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
+                            )
+                            ExposedDropdownMenu(expanded = statusExpanded, onDismissRequest = { statusExpanded = false }, modifier = Modifier.background(Color.White)) {
+                                statusOptions.forEach { option -> DropdownMenuItem(text = { Text(option) }, onClick = { selectedStatus = option; statusExpanded = false }) }
                             }
-                        )
+                        }
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.LocalShipping, contentDescription = null, tint = WishPrimary, modifier = Modifier.size(20.dp)); Spacer(modifier = Modifier.width(8.dp)); Text("希望物流方式", color = Color.Gray, fontSize = 14.sp) }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                logisticOptions.forEach { option ->
+                                    val isSelected = selectedLogistics.contains(option)
+                                    FilterChip(
+                                        selected = isSelected, onClick = { val current = selectedLogistics.toMutableSet(); if (isSelected) current.remove(option) else current.add(option); selectedLogistics = current },
+                                        label = { Text(option, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                        leadingIcon = if (isSelected) { { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null,
+                                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = WishPrimary, selectedLabelColor = Color.White, selectedLeadingIconColor = Color.White, containerColor = Color.White),
+                                        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = isSelected, borderColor = if (isSelected) Color.Transparent else Color.LightGray), shape = RoundedCornerShape(50)
+                                    )
+                                }
+                            }
+                        }
+                        BeautifulWishTextField(value = description, onValueChange = { description = it }, label = "願望描述", icon = Icons.Default.Description, singleLine = false, minLines = 4, placeholder = "詳細描述您希望的商品細節...")
+                        BeautifulWishTextField(value = note, onValueChange = { note = it }, label = "備註", icon = Icons.AutoMirrored.Filled.Notes, singleLine = false, minLines = 3, placeholder = "其他補充事項...")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Button(
+                    onClick = {
+                        if (title.isBlank() || description.isBlank() || price.isBlank() || selectedLogistics.isEmpty()) {
+                            Toast.makeText(context, "請填寫完整資訊", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        viewModel.submitWish(title, description, price, quantity, note, selectedStatus, selectedLogistics, photoUris, onSuccess = {
+                            // ★★★ 修正：成功後回到 WishList 頁面 ★★★
+                            navController.navigate(Screen.WishList.route) {
+                                popUpTo(Screen.WishList.route) { inclusive = true }
+                            }
+                        })
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp).shadow(8.dp, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = WishPrimary),
+                    enabled = !viewModel.isLoading
+                ) {
+                    if (viewModel.isLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp)); Spacer(modifier = Modifier.width(8.dp)); Text("送出中...", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    } else {
+                        Text("確認許願", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+                Spacer(modifier = Modifier.height(50.dp))
+            }
+            if (viewModel.isLoading) {
+                Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)).clickable(enabled = false) {}, contentAlignment = Alignment.Center) {
+                    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) { CircularProgressIndicator(color = WishPrimary); Spacer(modifier = Modifier.height(16.dp)); Text("願望發送中...", fontWeight = FontWeight.Bold, color = WishText) }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // --- 備註 ---
-            WishTextField(
-                value = note,
-                onValueChange = { note = it },
-                label = "備註",
-                singleLine = false,
-                modifier = Modifier.height(80.dp),
-                themeColor = mainOrangeColor
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // --- 物流方式 (橘色 Chips) ---
-            Text("希望物流方式", modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.Gray)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                logisticOptions.forEach { option ->
-                    val isSelected = selectedLogistics.contains(option)
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = {
-                            val current = selectedLogistics.toMutableSet()
-                            if (isSelected) current.remove(option) else current.add(option)
-                            selectedLogistics = current
-                        },
-                        label = { Text(option) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = mainOrangeColor,
-                            selectedLabelColor = Color.White
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = isSelected,
-                            borderColor = if(isSelected) Color.Transparent else Color.Gray
-                        )
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // --- 確認按鈕 (橘色) ---
-            Button(
-                onClick = {
-                    if (title.isBlank() || description.isBlank() || price.isBlank() || selectedLogistics.isEmpty()) {
-                        Toast.makeText(context, "請填寫完整資訊", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    Toast.makeText(context, "願望已送出", Toast.LENGTH_SHORT).show()
-                    navController.popBackStack()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = mainOrangeColor)
-            ) {
-                Text("確認許願", fontSize = 18.sp, color = Color.White)
-            }
-
-            Spacer(modifier = Modifier.height(50.dp))
         }
     }
 }
 
-// 專屬的橘色系 TextField
 @Composable
-fun WishTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    modifier: Modifier = Modifier.fillMaxWidth(),
-    singleLine: Boolean = true,
-    keyboardType: KeyboardType = KeyboardType.Text,
-    themeColor: Color
-) {
+fun BeautifulWishTextField(value: String, onValueChange: (String) -> Unit, label: String, icon: ImageVector? = null, modifier: Modifier = Modifier.fillMaxWidth(), singleLine: Boolean = true, minLines: Int = 1, keyboardType: KeyboardType = KeyboardType.Text, placeholder: String = "") {
     OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label, color = Color.Gray) },
-        modifier = modifier,
-        singleLine = singleLine,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        shape = RoundedCornerShape(12.dp),
-        // ★★★ 關鍵修改：強制設定文字顏色為黑色 ★★★
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
-            focusedBorderColor = themeColor,
-            unfocusedBorderColor = Color.LightGray,
-            focusedLabelColor = themeColor,
-            focusedTextColor = Color.Black,   // 聚焦時黑色
-            unfocusedTextColor = Color.Black  // 失焦時黑色
-        )
+        value = value, onValueChange = onValueChange,
+        label = { Text(text = label, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        placeholder = { Text(placeholder, color = Color.LightGray) },
+        leadingIcon = if (icon != null) { { Icon(icon, contentDescription = null, tint = WishPrimary) } } else null,
+        modifier = modifier, singleLine = singleLine, minLines = minLines, keyboardOptions = KeyboardOptions(keyboardType = keyboardType), shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White, focusedBorderColor = WishPrimary, unfocusedBorderColor = Color.LightGray, focusedLabelColor = WishPrimary, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
     )
 }

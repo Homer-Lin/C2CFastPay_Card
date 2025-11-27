@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.c2cfastpay_card.UIScreen.components.MatchRepository
 import com.example.c2cfastpay_card.UIScreen.components.ProductItem
 import com.example.c2cfastpay_card.UIScreen.components.ProductRepository
+import com.example.c2cfastpay_card.UIScreen.components.SwipeDirection
 import com.example.c2cfastpay_card.UIScreen.components.toMatchItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,15 +20,12 @@ class CardStackViewModel(
     private val matchRepository: MatchRepository
 ) : ViewModel() {
 
-    // 使用 StateFlow 來管理卡片列表 UI 狀態
     private val _cards = MutableStateFlow<List<ProductItem>>(emptyList())
     val cards: StateFlow<List<ProductItem>> = _cards.asStateFlow()
 
-    // 載入狀態
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    // 初始化時載入資料
     init {
         loadPotentialMatches()
     }
@@ -36,17 +34,17 @@ class CardStackViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // 【修正點】使用新版 Repository 的函式
-                // 原本是: productRepository.getProductList().first() ...
-                // 現在改為: getProductsForMatching() (直接回傳 List，且已過濾掉自己的商品)
-                val newCards = productRepository.getProductsForMatching()
+                // 1. 先取得已滑過的 ID 列表
+                val swipedIds = matchRepository.getSwipedProductIds()
+
+                // 2. 傳入 Repository 進行過濾
+                val newCards = productRepository.getProductsForMatching(swipedIds)
 
                 _cards.value = newCards
-                Log.d("CardStackViewModel", "成功載入 ${newCards.size} 張卡片")
+                Log.d("CardStackViewModel", "成功載入 ${newCards.size} 張未滑過的卡片")
 
             } catch (e: Exception) {
                 Log.e("CardStackViewModel", "載入卡片失敗", e)
-                // 這裡可以處理錯誤，例如顯示空列表或錯誤訊息
                 _cards.value = emptyList()
             } finally {
                 _isLoading.value = false
@@ -54,34 +52,29 @@ class CardStackViewModel(
         }
     }
 
-    // 左滑 (不喜歡 / Pass)
+    // 左滑 (Pass)
     fun swipeLeft(product: ProductItem) {
-        // 從列表中移除該卡片
-        _cards.update { currentList ->
-            currentList.filterNot { it.id == product.id }
+        _cards.update { list -> list.filterNot { it.id == product.id } }
+
+        viewModelScope.launch {
+            // 記錄到資料庫
+            matchRepository.recordSwipe(product.id, SwipeDirection.LEFT)
         }
     }
 
-    // 右滑 (喜歡 / Like)
+    // 右滑 (Like)
     fun swipeRight(product: ProductItem) {
+        _cards.update { list -> list.filterNot { it.id == product.id } }
+
         viewModelScope.launch {
             try {
-                // 1. 從列表中移除該卡片 (UI 先反應)
-                _cards.update { currentList ->
-                    currentList.filterNot { it.id == product.id }
-                }
-
-                // 2. 呼叫 Repository 執行雲端操作
+                // 記錄並檢查配對 (likeProduct 內部已包含 recordSwipe)
                 val isMatched = matchRepository.likeProduct(product)
-
                 if (isMatched) {
-                    // TODO: 這裡可以觸發一個 UI 事件，通知 View 顯示「配對成功」動畫
                     Log.d("CardStackViewModel", "HOST: 配對成功！")
                 }
-
             } catch (e: Exception) {
                 Log.e("CardStackViewModel", "儲存喜歡失敗", e)
-                // 這裡可以考慮是否把卡片加回去，或者提示網路錯誤
             }
         }
     }

@@ -121,7 +121,7 @@ fun SaleProductPage(
                     .align(Alignment.TopCenter)
                     .padding(top = 150.dp)
                     .fillMaxWidth(0.9f)
-                    .height(50.dp)
+                    .height(56.dp)
             ) {
                 OutlinedTextField(
                     value = searchQuery,
@@ -129,10 +129,14 @@ fun SaleProductPage(
                     label = {
                         Text(
                             "搜尋商品...",
-                            style = TextStyle(fontSize = 14.sp)
+                            style = TextStyle(fontSize = 14.sp, color = Color.Gray)
                         )
                     },
-                    textStyle = TextStyle(fontSize = 14.sp),
+                    // ★★★ 修正：明確設定文字顏色為黑色，避免深色模式看不到 ★★★
+                    textStyle = TextStyle(
+                        fontSize = 14.sp,
+                        color = Color.Black
+                    ),
                     singleLine = true,
                     leadingIcon = {
                         Icon(
@@ -150,22 +154,12 @@ fun SaleProductPage(
                         unfocusedContainerColor = Color.White.copy(alpha = 0.9f),
                         focusedBorderColor = primaryColor,
                         unfocusedBorderColor = Color.LightGray,
+                        // 確保文字輸入時也是黑色
+                        focusedTextColor = Color.Black,
+                        unfocusedTextColor = Color.Black
                     ),
                     shape = RoundedCornerShape(24.dp)
                 )
-
-                Spacer(Modifier.width(12.dp))
-
-                IconButton(
-                    onClick = { /* 切換檢視 */ },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.img_7),
-                        contentDescription = "Toggle View",
-                        tint = primaryColor
-                    )
-                }
             }
 
             // --- 商品列表 (Grid 雙欄顯示) ---
@@ -232,14 +226,19 @@ fun SaleProductPage(
 
                                 Spacer(modifier = Modifier.height(4.dp))
 
-                                // ★★★ 修改處：移除了「品牌」那一行 ★★★
+                                // 賣家資訊
+                                Text(
+                                    text = "賣家: ${product.ownerName.ifBlank { "匿名" }}",
+                                    fontSize = 11.sp,
+                                    color = Color.Gray
+                                )
 
-                                // 狀態標籤 (顯示在新的一行)
+                                // 狀態標籤
                                 Text(
                                     text = "#${product.condition.ifBlank { "二手" }}",
                                     fontSize = 11.sp,
                                     color = Color.Gray,
-                                    modifier = Modifier.padding(bottom = 8.dp) // 增加一點底部間距
+                                    modifier = Modifier.padding(bottom = 8.dp)
                                 )
 
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -267,7 +266,7 @@ fun SaleProductPage(
                                         )
                                     }
 
-                                    // 右下角庫存標籤 (只顯示 > 0 的，且已經過濾過)
+                                    // 右下角庫存標籤
                                     Surface(
                                         color = primaryColor,
                                         shape = RoundedCornerShape(4.dp)
@@ -287,7 +286,7 @@ fun SaleProductPage(
                 }
             }
 
-            // --- 頂層：透明標題列與購物車 (保持不變) ---
+            // --- 頂層：透明標題列與購物車 ---
             TopAppBar(
                 title = { },
                 navigationIcon = {},

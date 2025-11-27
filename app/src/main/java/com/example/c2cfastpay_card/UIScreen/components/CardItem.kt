@@ -1,43 +1,45 @@
 package com.example.c2cfastpay_card.UIScreen.components
 
-// --- 【1. 新增必要的 import】 ---
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable // 【確保 import】
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll // 【確保 import】
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip // 【新增】
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer // 【確保 import】
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource // 【新增】
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
-import com.example.c2cfastpay_card.R // 【新增】 為了 R.drawable...
+import com.example.c2cfastpay_card.R
 
-@OptIn(ExperimentalMaterial3Api::class) // 為了 ExposedDropdownMenuBox
 @Composable
 fun CardItem(
     modifier: Modifier = Modifier,
     product: ProductItem,
     offset: Offset,
 ) {
-    // --- (翻轉動畫狀態，保持不變) ---
+    // 1. 翻轉狀態管理
     var isFlipped by remember { mutableStateOf(false) }
+
+    // 2. 動畫數值 (0f -> 180f)
     val rotation by animateFloatAsState(
         targetValue = if (isFlipped) 180f else 0f,
+        animationSpec = tween(durationMillis = 400), // 動畫時間
         label = "rotation"
     )
 
@@ -45,38 +47,46 @@ fun CardItem(
         modifier = modifier
             .fillMaxSize()
             .graphicsLayer {
+                // Y 軸旋轉造成翻牌效果
                 rotationY = rotation
+                // 設定相機距離，讓 3D 效果更明顯
                 cameraDistance = 8 * density
             },
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
-
+        // 根據旋轉角度決定顯示「正面」還是「背面」
         if (rotation <= 90f) {
-            // --- 這是卡片正面 ---
+            // ==========================================
+            // 正面 (Front)
+            // ==========================================
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clickable { isFlipped = true } // 點擊正面
+                    .clickable { isFlipped = true } // 點擊翻到背面
             ) {
-                // (您原本的正面程式碼，保持不變)
+                // 商品圖片
                 Image(
                     painter = rememberAsyncImagePainter(model = product.imageUri),
                     contentDescription = product.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
+
+                // 漸層陰影 (讓文字更清楚)
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
-                                startY = Float.POSITIVE_INFINITY,
-                                endY = 0f
-                            ),
+                                startY = 0f,
+                                endY = Float.POSITIVE_INFINITY
+                            )
                         )
                 )
+
+                // 底部文字資訊
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -95,92 +105,94 @@ fun CardItem(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "NT$ ${product.price}",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.9f)
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFFC107) // 金黃色強調價格
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = product.description.ifEmpty { "無商品描述" },
+                        text = product.description.take(50) + if(product.description.length > 50) "..." else "",
                         fontSize = 14.sp,
                         color = Color.White.copy(alpha = 0.8f),
-                        maxLines = 3,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "點擊查看詳情",
+                        fontSize = 12.sp,
+                        color = Color.LightGray
                     )
                 }
             }
-            // --- 卡片正面結束 ---
-
         } else {
-
-            // --- 【6. 這是卡片背面 (美編 + 內縮版)】 ---
+            // ==========================================
+            // 背面 (Back)
+            // ==========================================
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { rotationY = 180f } // 鏡像翻轉
-                    .clickable { isFlipped = false } // 點擊背面
+                    .graphicsLayer { rotationY = 180f }
+                    .clickable { isFlipped = false }
             ) {
-                // 【美編】背景圖
+                // 背景圖
                 Image(
-                    painter = painterResource(R.drawable.b_14_business_card_front_page), //
-                    contentDescription = "卡片背面",
+                    painter = painterResource(R.drawable.b_14_business_card_front_page),
+                    contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // 【美編】使用 Box 將內容推到底部
+                // 內縮的白色資訊區塊
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        // 【您的要求】在四周加入 padding，讓白底內縮
                         .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
-                    contentAlignment = Alignment.BottomCenter // 將「白底」對齊底部
+                    contentAlignment = Alignment.BottomCenter
                 ) {
-                    // --- 【固定高度的白底】 ---
                     Column(
                         modifier = Modifier
-                            // 【修改】現在它會填滿 'padding' 後的寬度
                             .fillMaxWidth()
-                            .height(370.dp)
-                            // 【美編】讓四個角都有圓角
+                            .height(400.dp)
                             .clip(RoundedCornerShape(24.dp))
                             .background(Color.White.copy(alpha = 0.95f))
+                            .verticalScroll(rememberScrollState())
+                            .padding(20.dp)
                     ) {
-                        // --- 【內部可滾動的內容】 ---
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(20.dp)
-                        ) {
-                            Text(
-                                text = product.title,
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.Black
-                            )
-                            Text(
-                                text = "NT$ ${product.price}",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = Color(0xFF6A0000) // 深紅色
-                            )
+                        // 標題與價格
+                        Text(
+                            text = product.title,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                        Text(
+                            text = "NT$ ${product.price}",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFB71C1C),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
 
-                            Divider(modifier = Modifier.padding(vertical = 16.dp))
+                        Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color.LightGray)
 
-                            // 顯示商品描述
-                            DetailRow(title = "商品描述", content = product.description.ifEmpty { "(無描述)" })
+                        // ★★★ 新增：賣家資訊 ★★★
+                        DetailSection("賣家", product.ownerName.ifEmpty { "匿名賣家" })
 
-                            // 顯示商品規格
-                            DetailRow(title = "商品規格", content = product.specs.ifEmpty { "(無規格)" })
+                        // 其他詳細資訊
+                        DetailSection("商品描述", product.description)
+                        DetailSection("商品規格", product.specs)
+                        DetailSection("商品故事", product.story)
+                        DetailSection("注意事項", product.notes)
 
-                            // 顯示注意事項
-                            DetailRow(title = "注意事項", content = product.notes.ifEmpty { "(無)" })
+                        Spacer(modifier = Modifier.height(20.dp))
 
-                            // 顯示其他資訊
-                            DetailRow(title = "其他資訊", content = product.other.ifEmpty { "(無)" })
-
-                            Spacer(modifier = Modifier.height(20.dp)) // 滾到底部的緩衝
-                        }
+                        Text(
+                            text = "再次點擊返回圖片",
+                            fontSize = 12.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
                     }
                 }
             }
@@ -188,19 +200,24 @@ fun CardItem(
     }
 }
 
-// 【美編】共用的 Composable
+// 輔助元件：顯示標題與內容
 @Composable
-private fun DetailRow(title: String, content: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        color = Color.Black
-    )
-    Text(
-        text = content,
-        style = MaterialTheme.typography.bodyLarge,
-        modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
-        color = Color.DarkGray // 內容使用深灰色
-    )
+fun DetailSection(title: String, content: String) {
+    if (content.isNotBlank()) {
+        Column(modifier = Modifier.padding(bottom = 12.dp)) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF487F81) // 主題藍綠色
+            )
+            Text(
+                text = content,
+                fontSize = 14.sp,
+                color = Color.DarkGray,
+                lineHeight = 20.sp,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+    }
 }

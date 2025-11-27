@@ -19,7 +19,10 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.example.c2cfastpay_card.ProductFlowViewModel
+
+// 引用 ViewModel
+import com.example.c2cfastpay_card.UIScreen.Screens.ProductFlowViewModel
+
 import com.example.c2cfastpay_card.UIScreen.Screens.AIChatScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.AddProductScreen
 import com.example.c2cfastpay_card.UIScreen.Screens.AddProductStepOne
@@ -41,21 +44,17 @@ import com.example.c2cfastpay_card.UIScreen.Screens.WishDetailScreen
 import com.example.c2cfastpay_card.UIScreen.components.WishRepository
 import com.google.gson.Gson
 
-/**
- * 這是「導航圖」(NavHost)。
- * 它就像一個「總控制器」，根據 NavController 的指令，決定現在該顯示哪個畫面。
- */
 @Composable
 fun AppNavigationGraph(
     navController: NavHostController,
+    startDestination: String
 ) {
-    // 【重要】宣告 ProductFlowViewModel (共用 ViewModel)
-    // 這樣 AddStep1 可以存照片，AIChatScreen 可以讀取照片
+    // 建立共用的 ViewModel
     val productFlowViewModel: ProductFlowViewModel = viewModel()
 
     NavHost(
         navController = navController,
-        startDestination = Screen.Login.route // 設定 App 啟動時的第一個畫面
+        startDestination = startDestination
     ) {
 
         // --- 登入/註冊流程 ---
@@ -83,62 +82,27 @@ fun AppNavigationGraph(
                 navController = navController,
                 onConfirmSuccess = { navController.popBackStack() },
                 onSwitchToLogin = {
-                    navController.popBackStack() // 返回上一頁 (即登入頁)
+                    navController.popBackStack()
                 }
             )
         }
 
         // --- 主功能頁面 ---
 
-        // 1. 卡片堆疊
         composable(route = Screen.CardStack.route) {
             CardStackScreen(navController = navController)
         }
 
-        // 2. 歷史紀錄
         composable(route = Screen.History.route) {
             HistoryScreen(navController = navController)
         }
 
-        // 3. 販售首頁
         composable(route = Screen.Sale.route) {
             SaleProductPage(navController = navController)
         }
 
-        // 4. 許願池
         composable(route = Screen.WishList.route) {
             WishPreviewPage(navController = navController)
-        }
-
-        composable(
-            route = "add_product?draftJson={draftJson}&wishUuid={wishUuid}",
-            // ... arguments 設定 ...
-        ) { backStackEntry ->
-            val context = LocalContext.current
-            val wishRepository = remember { WishRepository(context) }
-
-            // 取得參數
-            val draftJson = backStackEntry.arguments?.getString("draftJson")
-            val wishUuid = backStackEntry.arguments?.getString("wishUuid")
-
-            var finalJsonForScreen by remember { mutableStateOf<String?>(draftJson) }
-
-            // ★ 關鍵：如果有 wishUuid，就去抓資料並轉成 JSON
-            LaunchedEffect(wishUuid) {
-                if (wishUuid != null && wishUuid != "null" && wishUuid.isNotEmpty()) {
-                    val wishItem = wishRepository.getWishByUuid(wishUuid)
-                    if (wishItem != null) {
-                        // 轉成 JSON 字串傳給 Screen
-                        finalJsonForScreen = Gson().toJson(wishItem)
-                    }
-                }
-            }
-
-            // 顯示 Screen
-            AddProductScreen(
-                navController = navController,
-                draftJson = finalJsonForScreen // 這裡會把 Wish 的資料傳進去
-            )
         }
 
         // 5. 新增選擇頁 (許願或商品)
@@ -157,7 +121,7 @@ fun AppNavigationGraph(
         }
 
         // ==========================================
-        // 【流程】AI 上架助手 (AIChat)
+        // 【流程】AI 上架助手 (AIChat) - ★★★ 修正：取消註解 ★★★
         // ==========================================
         composable(
             route = "ai_chat?imageUri={imageUri}",
@@ -166,16 +130,19 @@ fun AppNavigationGraph(
                 nullable = true
                 defaultValue = null
             })
-        ) {
+        ) { backStackEntry ->
+            // 取得傳遞過來的 imageUri 參數
+            val imageUri = backStackEntry.arguments?.getString("imageUri")
+
             AIChatScreen(
                 navController = navController,
-                flowViewModel = productFlowViewModel
+                flowViewModel = productFlowViewModel,
+                imageUri = imageUri // 將參數傳入 Screen
             )
         }
 
         // ==========================================
         // 【流程】上架填寫頁 (AddProduct)
-        // 同時支援：1. AI/手動帶入的草稿 (draftJson)  2. 許願池帶入的資料 (wishUuid)
         // ==========================================
         composable(
             route = "add_product?draftJson={draftJson}&wishUuid={wishUuid}",
@@ -195,21 +162,16 @@ fun AppNavigationGraph(
             val context = LocalContext.current
             val wishRepository = remember { WishRepository(context) }
 
-            // 取得參數
             val draftJson = backStackEntry.arguments?.getString("draftJson")
             val wishUuid = backStackEntry.arguments?.getString("wishUuid")
 
-            // 用來決定最後要傳給 Screen 的 JSON
             var finalJsonForScreen by remember { mutableStateOf<String?>(draftJson) }
             var isLoading by remember { mutableStateOf(false) }
 
-            // 如果有 wishUuid，代表是從許願池來的，需要去資料庫抓資料
             LaunchedEffect(wishUuid) {
                 if (wishUuid != null && wishUuid != "null" && wishUuid.isNotEmpty()) {
                     isLoading = true
                     val wishItem = wishRepository.getWishByUuid(wishUuid)
-                    Log.d("NavGraph", "從許願池抓取資料: $wishItem")
-
                     if (wishItem != null) {
                         finalJsonForScreen = Gson().toJson(wishItem)
                     }
@@ -217,7 +179,6 @@ fun AppNavigationGraph(
                 }
             }
 
-            // 顯示畫面
             if (!isLoading) {
                 AddProductScreen(
                     navController = navController,
@@ -270,7 +231,7 @@ fun AppNavigationGraph(
         }
 
         // ==========================================
-        // 【新增】會員相關頁面 (補上遺漏的部分)
+        // 【新增】會員相關頁面
         // ==========================================
         composable(route = Screen.User.route) {
             UserScreen(navController = navController)
@@ -287,6 +248,5 @@ fun AppNavigationGraph(
             val wishUuid = backStackEntry.arguments?.getString("wishUuid") ?: ""
             WishDetailScreen(navController = navController, wishUuid = wishUuid)
         }
-
     }
 }
