@@ -75,8 +75,8 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
     var cameraUris by remember { mutableStateOf<Set<Uri>>(emptySet()) }
 
     var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
-    var story by remember { mutableStateOf("") }
+    var content by remember { mutableStateOf("") } // 商品文案
+    var story by remember { mutableStateOf("") }   // 商品故事
     var price by remember { mutableStateOf("") }
     var stock by remember { mutableStateOf("1") }
 
@@ -128,8 +128,20 @@ fun AddProductScreen(navController: NavController, draftJson: String? = null) {
                     if (wishData.payment.contains("面交")) newLogistics.add("面交")
                     if (newLogistics.isNotEmpty()) selectedLogistics = newLogistics
                 }
+
+                if (wishData.payment.isNotEmpty()) {
+                    val newLogistics = mutableSetOf<String>()
+                    if (wishData.payment.contains("7-11")) newLogistics.add("7-11")
+                    if (wishData.payment.contains("全家")) newLogistics.add("全家")
+                    if (wishData.payment.contains("面交")) newLogistics.add("面交")
+
+                    if (newLogistics.isNotEmpty()) {
+                        selectedLogistics = newLogistics
+                    }
+                }
+                Log.d("AddProductScreen", "已自動帶入許願資料: ${wishData.title}")
             } catch (e: Exception) {
-                Log.e("AddProductScreen", "解析失敗", e)
+                Log.e("AddProductScreen", "解析失敗，可能是格式不符", e)
             }
         }
     }
@@ -463,6 +475,7 @@ fun BeautifulTextField(
         minLines = minLines,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         shape = RoundedCornerShape(12.dp),
+        // ★★★ 關鍵修改：強制設定文字顏色為黑色 ★★★
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = Color.White,
             unfocusedContainerColor = Color.White,

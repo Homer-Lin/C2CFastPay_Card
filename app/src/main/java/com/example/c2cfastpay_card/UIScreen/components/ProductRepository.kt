@@ -150,6 +150,9 @@ class ProductRepository(private val context: Context) {
         }
     }
 
+    /**
+     * 4. 根據 ID 取得單一商品詳情
+     */
     suspend fun getProductById(productId: String): ProductItem? {
         return try {
             val snapshot = db.collection("products").document(productId).get().await()

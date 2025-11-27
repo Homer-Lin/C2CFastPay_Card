@@ -228,6 +228,7 @@ fun RegisterScreen(
                 )
             }
 
+            // 錯誤訊息顯示
             if (viewModel.errorMessage.isNotEmpty()) {
                 Text(
                     text = viewModel.errorMessage,

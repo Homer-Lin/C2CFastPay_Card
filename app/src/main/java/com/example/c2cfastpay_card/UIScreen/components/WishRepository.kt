@@ -1,7 +1,6 @@
 package com.example.c2cfastpay_card.UIScreen.components
 
 import android.content.Context
-import android.net.Uri
 import android.util.Log
 import com.example.c2cfastpay_card.model.WishItem // 請確認這行與您的 WishItem package 一致
 import com.example.c2cfastpay_card.data.User // 引用 User 資料模型
@@ -15,7 +14,6 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
-import java.util.UUID
 
 class WishRepository(private val context: Context) {
 

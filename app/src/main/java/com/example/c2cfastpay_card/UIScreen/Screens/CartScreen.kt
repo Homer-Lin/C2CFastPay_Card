@@ -61,6 +61,9 @@ fun CartScreen(navController: NavController) {
         }
     }
 
+    // 計算已選數量
+    val selectedCount = cartItems.count { it.isChecked }
+
     MaterialTheme(colorScheme = SaleColorScheme) {
         Scaffold(
             topBar = {
